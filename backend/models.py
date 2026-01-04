@@ -63,9 +63,7 @@ class CleanupRule(Base):
     min_file_size_gb: Mapped[float | None] = mapped_column(Float, default=None)
 
     # actions
-    auto_tag: Mapped[bool] = mapped_column(
-        Boolean, default=True
-    )  # TODO: should we auto tag? research this!
+    auto_tag: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # series-specific
     delete_partial_seasons: Mapped[bool] = mapped_column(Boolean, default=False)
