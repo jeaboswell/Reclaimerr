@@ -38,13 +38,18 @@ class ServiceConfig(Base):
 
     __tablename__ = "service_configs"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False)
-    service_type: Mapped[Service] = mapped_column(Enum(Service))
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, init=False, autoincrement=True
+    )
+    service_type: Mapped[Service] = mapped_column(Enum(Service), unique=True)
     base_url: Mapped[str] = mapped_column(String(255))
     api_key: Mapped[str] = mapped_column(String(255))
     enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.utcnow(), onupdate=func.utcnow(), init=False
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+        init=False,
     )
 
 
