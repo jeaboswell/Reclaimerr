@@ -87,6 +87,14 @@ class RadarrClient:
             return status_code, response.json()
         return status_code, None
 
+    def health(self) -> bool:
+        """Check server health and API key."""
+        try:
+            self._make_request("GET", "health")
+            return True
+        except Exception:
+            return False
+
     def get_movie(self, movie_id: int) -> RadarrMovie:
         """Get movie by ID."""
         status_code, data = self._make_request("GET", f"movie/{movie_id}")
@@ -98,14 +106,14 @@ class RadarrClient:
 
     def get_all_movies(self) -> list[RadarrMovie]:
         """Get all movies from Radarr."""
-        status_code, data = self._make_request("GET", "movie")
+        _, data = self._make_request("GET", "movie")
         if not isinstance(data, list):
             return []
         return [build_radarr_movie_from_dict(movie) for movie in data]
 
     def get_tags(self) -> list[RadarrTag]:
         """Get all tags from Radarr."""
-        status_code, data = self._make_request("GET", "tag")
+        _, data = self._make_request("GET", "tag")
         if not isinstance(data, list):
             return []
         return [RadarrTag(id=tag["id"], label=tag["label"]) for tag in data]

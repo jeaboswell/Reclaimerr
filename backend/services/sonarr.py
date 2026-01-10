@@ -117,6 +117,14 @@ class SonarrClient:
             return status_code, response.json()
         return status_code, None
 
+    def health(self) -> bool:
+        """Check server health and API key."""
+        try:
+            self._make_request("GET", "health")
+            return True
+        except Exception:
+            return False
+
     def get_series(self, series_id: int) -> SonarrSeries:
         """Get series by ID.
 
