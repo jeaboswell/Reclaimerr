@@ -1,47 +1,14 @@
 import logging
-import sys
 from datetime import datetime
-from enum import Enum
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 import shortuuid
-from typing_extensions import override
 
 from backend.core.__version__ import __version__, program_name
-from backend.core.utils.working_dir import RUNTIME_DIR
-
-
-class LogLevel(Enum):
-    """Enum class for pythons built in logging class debug types"""
-
-    DEBUG = 10
-    INFO = 20
-    WARNING = 30
-    ERROR = 40
-    CRITICAL = 50
-
-    @override
-    def __str__(self) -> str:
-        level_map = {
-            LogLevel.DEBUG: "Debug",
-            LogLevel.INFO: "Info",
-            LogLevel.WARNING: "Warning",
-            LogLevel.ERROR: "Error",
-            LogLevel.CRITICAL: "Critical",
-        }
-        return level_map[self]
-
-
-class LogSource(Enum):
-    """
-    Enum to control tag for frontend vs backend
-    FE: Frontend
-    BE: Backend
-    """
-
-    FE = "[FE]"
-    BE = "[BE]"
+from backend.core.logger.enums import LogSource
+from backend.core.logger.levels import LogLevel
+from backend.core.settings import settings
 
 
 class Logger:
@@ -152,11 +119,11 @@ class Logger:
                 del_file.unlink()
 
 
+# initialize global logger instance
 _date_time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 _short_uuid = shortuuid.uuid()[:7]
 _log_filename = (
     f"{program_name.lower().replace(' ', '_')}_{_date_time_str}_{_short_uuid}.log"
 )
-_log_path = RUNTIME_DIR / "logs" / _log_filename
-_to_console = "debug" in sys.executable.lower()
-LOG = Logger(_log_path, to_console=_to_console)
+_log_path = settings.log_dir / _log_filename
+LOG = Logger(_log_path)
