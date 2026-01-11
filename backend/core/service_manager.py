@@ -8,167 +8,167 @@ from backend.services.seerr import SeerrClient
 from backend.services.sonarr import SonarrClient
 
 
-class ClientManager:
-    """Manages all service client instances.
+class ServiceManager:
+    """Manages all service instances.
 
     Service configurations should be loaded from the database (ServiceConfig table)
     and passed to the initialize_* methods.
     """
 
     def __init__(self) -> None:
-        """Initialize client manager with no active clients."""
+        """Initialize service manager with no active clients."""
         self._jellyfin: JellyfinBackend | None = None
         self._plex: PlexBackend | None = None
         self._radarr: RadarrClient | None = None
         self._sonarr: SonarrClient | None = None
         self._seerr: SeerrClient | None = None
 
-        LOG.info("ClientManager initialized")
+        LOG.info("ServiceManager initialized")
 
     @property
     def jellyfin(self) -> JellyfinBackend | None:
-        """Get Jellyfin client (must be initialized first)."""
+        """Get Jellyfin service (must be initialized first)."""
         return self._jellyfin
 
     @property
     def plex(self) -> PlexBackend | None:
-        """Get Plex client (must be initialized first)."""
+        """Get Plex service (must be initialized first)."""
         return self._plex
 
     @property
     def radarr(self) -> RadarrClient | None:
-        """Get Radarr client (must be initialized first)."""
+        """Get Radarr service (must be initialized first)."""
         return self._radarr
 
     @property
     def sonarr(self) -> SonarrClient | None:
-        """Get Sonarr client (must be initialized first)."""
+        """Get Sonarr service (must be initialized first)."""
         return self._sonarr
 
     @property
     def seerr(self) -> SeerrClient | None:
-        """Get Seerr client (must be initialized first)."""
+        """Get Seerr service (must be initialized first)."""
         return self._seerr
 
     async def initialize_jellyfin(
         self, base_url: str, api_key: str
     ) -> JellyfinBackend | None:
-        """Initialize Jellyfin client with provided config."""
+        """Initialize Jellyfin service with provided config."""
         try:
             self._jellyfin = JellyfinBackend(
                 api_key=api_key,
                 jellyfin_url=base_url,
             )
             if not await self._jellyfin.health():
-                LOG.error(f"Jellyfin client health check failed: {base_url}")
-                raise ValueError(f"Jellyfin client health check failed: {base_url}")
-            LOG.info(f"Jellyfin client initialized: {base_url}")
+                LOG.error(f"Jellyfin service health check failed: {base_url}")
+                raise ValueError(f"Jellyfin service health check failed: {base_url}")
+            LOG.info(f"Jellyfin service initialized: {base_url}")
             return self._jellyfin
         except Exception as e:
-            LOG.error(f"Failed to initialize Jellyfin client: {e}")
+            LOG.error(f"Failed to initialize Jellyfin service: {e}")
             return None
 
     async def initialize_plex(self, base_url: str, token: str) -> PlexBackend | None:
-        """Initialize Plex client with provided config."""
+        """Initialize Plex service with provided config."""
         try:
             self._plex = PlexBackend(
                 token=token,
                 plex_url=base_url,
             )
             if not await self._plex.health():
-                LOG.error(f"Plex client health check failed: {base_url}")
-                raise ValueError(f"Plex client health check failed: {base_url}")
-            LOG.info(f"Plex client initialized: {base_url}")
+                LOG.error(f"Plex service health check failed: {base_url}")
+                raise ValueError(f"Plex service health check failed: {base_url}")
+            LOG.info(f"Plex service initialized: {base_url}")
             return self._plex
         except Exception as e:
-            LOG.error(f"Failed to initialize Plex client: {e}")
+            LOG.error(f"Failed to initialize Plex service: {e}")
             return None
 
     async def initialize_radarr(
         self, base_url: str, api_key: str
     ) -> RadarrClient | None:
-        """Initialize Radarr client with provided config."""
+        """Initialize Radarr service with provided config."""
         try:
             self._radarr = RadarrClient(
                 api_key=api_key,
                 base_url=base_url,
             )
             if not await self._radarr.health():
-                LOG.error(f"Radarr client health check failed: {base_url}")
-                raise ValueError(f"Radarr client health check failed: {base_url}")
-            LOG.info(f"Radarr client initialized: {base_url}")
+                LOG.error(f"Radarr service health check failed: {base_url}")
+                raise ValueError(f"Radarr service health check failed: {base_url}")
+            LOG.info(f"Radarr service initialized: {base_url}")
             return self._radarr
         except Exception as e:
-            LOG.error(f"Failed to initialize Radarr client: {e}")
+            LOG.error(f"Failed to initialize Radarr service: {e}")
             return None
 
     async def initialize_sonarr(
         self, base_url: str, api_key: str
     ) -> SonarrClient | None:
-        """Initialize Sonarr client with provided config."""
+        """Initialize Sonarr service with provided config."""
         try:
             self._sonarr = SonarrClient(
                 api_key=api_key,
                 base_url=base_url,
             )
             if not await self._sonarr.health():
-                LOG.error(f"Sonarr client health check failed: {base_url}")
-                raise ValueError(f"Sonarr client health check failed: {base_url}")
-            LOG.info(f"Sonarr client initialized: {base_url}")
+                LOG.error(f"Sonarr service health check failed: {base_url}")
+                raise ValueError(f"Sonarr service health check failed: {base_url}")
+            LOG.info(f"Sonarr service initialized: {base_url}")
             return self._sonarr
         except Exception as e:
-            LOG.error(f"Failed to initialize Sonarr client: {e}")
+            LOG.error(f"Failed to initialize Sonarr service: {e}")
             return None
 
     async def initialize_seerr(self, base_url: str, api_key: str) -> SeerrClient | None:
-        """Initialize Seerr client with provided config."""
+        """Initialize Seerr service with provided config."""
         try:
             self._seerr = SeerrClient(
                 api_key=api_key,
                 base_url=base_url,
             )
             if not await self._seerr.health():
-                LOG.error(f"Seerr client health check failed: {base_url}")
-                raise ValueError(f"Seerr client health check failed: {base_url}")
-            LOG.info(f"Seerr client initialized: {base_url}")
+                LOG.error(f"Seerr service health check failed: {base_url}")
+                raise ValueError(f"Seerr service health check failed: {base_url}")
+            LOG.info(f"Seerr service initialized: {base_url}")
             return self._seerr
         except Exception as e:
-            LOG.error(f"Failed to initialize Seerr client: {e}")
+            LOG.error(f"Failed to initialize Seerr service: {e}")
             return None
 
     async def clear_jellyfin(self) -> None:
-        """Clear Jellyfin client (call before reinitializing)."""
+        """Clear Jellyfin service (call before reinitializing)."""
         if self._jellyfin and self._jellyfin.session:
             await self._jellyfin.session.close()
-            LOG.info("Jellyfin client cleared")
+            LOG.info("Jellyfin service cleared")
         self._jellyfin = None
 
     async def clear_plex(self) -> None:
-        """Clear Plex client (call before reinitializing)."""
+        """Clear Plex service (call before reinitializing)."""
         if self._plex and self._plex.session:
             await self._plex.session.close()
-            LOG.info("Plex client cleared")
+            LOG.info("Plex service cleared")
         self._plex = None
 
     async def clear_radarr(self) -> None:
-        """Clear Radarr client (call before reinitializing)."""
+        """Clear Radarr service (call before reinitializing)."""
         if self._radarr and self._radarr.session:
             await self._radarr.session.close()
-            LOG.info("Radarr client cleared")
+            LOG.info("Radarr service cleared")
         self._radarr = None
 
     async def clear_sonarr(self) -> None:
-        """Clear Sonarr client (call before reinitializing)."""
+        """Clear Sonarr service (call before reinitializing)."""
         if self._sonarr and self._sonarr.session:
             await self._sonarr.session.close()
-            LOG.info("Sonarr client cleared")
+            LOG.info("Sonarr service cleared")
         self._sonarr = None
 
     async def clear_seerr(self) -> None:
-        """Clear Seerr client (call before reinitializing)."""
+        """Clear Seerr service (call before reinitializing)."""
         if self._seerr and self._seerr.session:
             await self._seerr.session.close()
-            LOG.info("Seerr client cleared")
+            LOG.info("Seerr service cleared")
         self._seerr = None
 
     async def clear_all(self) -> None:
@@ -192,4 +192,4 @@ class ClientManager:
 
 
 # global manager instance
-client_manager = ClientManager()
+client_manager = ServiceManager()
