@@ -126,4 +126,4 @@ _log_filename = (
     f"{program_name.lower().replace(' ', '_')}_{_date_time_str}_{_short_uuid}.log"
 )
 _log_path = settings.log_dir / _log_filename
-LOG = Logger(_log_path)
+LOG = Logger(_log_path, to_console=True)
