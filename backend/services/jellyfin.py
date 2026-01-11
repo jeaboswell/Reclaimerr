@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from typing import Any
 
@@ -31,11 +32,30 @@ class JellyfinBackend:
         self._virtual_folders: list[dict] | None = None
 
     async def _make_request(self, endpoint: str, params: dict | None = None):
-        response = await niquests.aget(
-            f"{self.jellyfin_url}/{endpoint}", params=params, headers=self.headers
-        )
-        response.raise_for_status()
-        return response.json()
+        max_retries = 3
+
+        for attempt in range(max_retries):
+            try:
+                response = await niquests.aget(
+                    f"{self.jellyfin_url}/{endpoint}",
+                    params=params,
+                    headers=self.headers,
+                )
+
+                # retry on rate limit or server error
+                if response.status_code in (429, 503, 502, 504):
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2**attempt)
+                        continue
+
+                response.raise_for_status()
+                return response.json()
+
+            except (ConnectionError, TimeoutError) as e:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2**attempt)
+                    continue
+                raise
 
     async def _get_virtual_folders(self) -> list[dict]:
         """Get and cache virtual folders (libraries)."""
@@ -88,6 +108,8 @@ class JellyfinBackend:
     async def get_users(self) -> list[JellyfinUser]:
         """Get all Jellyfin users."""
         users_data = await self._make_request("Users")
+        if not users_data:
+            return []
         return [JellyfinUser(name=user["Name"], id=user["Id"]) for user in users_data]
 
     async def get_movies_for_user(
@@ -104,7 +126,10 @@ class JellyfinBackend:
         }
         if filters:
             params.update(filters)
-        items_data = (await self._make_request("Items", params=params)).get("Items", [])
+        get_data = await self._make_request("Items", params=params)
+        if not get_data:
+            return []
+        items_data = get_data.get("Items", [])
         data = []
         for item in items_data:
             # get library information using path (most reliable)
@@ -170,7 +195,10 @@ class JellyfinBackend:
         }
         if filters:
             params.update(filters)
-        items_data = (await self._make_request("Items", params=params)).get("Items", [])
+        get_data = await self._make_request("Items", params=params)
+        if not get_data:
+            return []
+        items_data = get_data.get("Items", [])
         data = []
         for item in items_data:
             # get library information using path (most reliable)
@@ -240,11 +268,13 @@ class JellyfinBackend:
                 "SortBy": "DatePlayed",
                 "SortOrder": "Descending",
             }
-            response = await self._make_request("Items", params=params)
-            items = response.get("Items", [])
+            get_data = await self._make_request("Items", params=params)
+            if not get_data:
+                raise Exception("No data returned")
+            items_data = get_data.get("Items", [])
 
             # group by series and keep the most recent watch date
-            for item in items:
+            for item in items_data:
                 series_id = item.get("SeriesId")
                 last_played = item.get("UserData", {}).get("LastPlayedDate")
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 
 import niquests
@@ -21,11 +22,28 @@ class PlexBackend:
         }
 
     async def _make_request(self, endpoint: str, params: dict | None = None):
-        response = await niquests.aget(
-            f"{self.plex_url}/{endpoint}", params=params, headers=self.headers
-        )
-        response.raise_for_status()
-        return response.json()
+        max_retries = 3
+
+        for attempt in range(max_retries):
+            try:
+                response = await niquests.aget(
+                    f"{self.plex_url}/{endpoint}", params=params, headers=self.headers
+                )
+
+                # retry on rate limit or server error
+                if response.status_code in (429, 503, 502, 504):
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2**attempt)
+                        continue
+
+                response.raise_for_status()
+                return response.json()
+
+            except (ConnectionError, TimeoutError) as e:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2**attempt)
+                    continue
+                raise
 
     async def health(self) -> bool:
         """Check server health and API key."""
@@ -38,6 +56,8 @@ class PlexBackend:
     async def get_library_sections(self) -> list[dict]:
         """Get all library sections."""
         data = await self._make_request("library/sections")
+        if not data:
+            return []
         return data.get("MediaContainer", {}).get("Directory", [])
 
     async def get_movies(
@@ -66,6 +86,8 @@ class PlexBackend:
                 f"library/sections/{section_id}/all",
                 params={"type": 1, "includeGuids": 1},
             )
+            if not items_data:
+                continue
             items = items_data.get("MediaContainer", {}).get("Metadata", [])
 
             for item in items:
@@ -122,6 +144,8 @@ class PlexBackend:
                 f"library/sections/{section_id}/all",
                 params={"type": 2, "includeGuids": 1},
             )
+            if not items_data:
+                continue
             items = items_data.get("MediaContainer", {}).get("Metadata", [])
 
             for item in items:

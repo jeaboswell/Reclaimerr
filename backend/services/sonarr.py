@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import niquests
 
 from backend.models.clients.sonarr import SonarrSeason, SonarrSeries
@@ -58,18 +60,39 @@ class SonarrClient:
         Returns:
             Tuple of (status_code, response_data)
         """
-        response = await niquests.arequest(
-            method, f"{self.base_url}/api/v3/{endpoint}", headers=self.headers, **kwargs
-        )
-        response.raise_for_status()
+        url = f"{self.base_url}/api/v3/{endpoint}"
+        max_retries = 3
 
-        status_code = response.status_code
-        if not status_code:
-            raise ValueError("Status code should not be None")
+        for attempt in range(max_retries):
+            try:
+                response = await niquests.arequest(
+                    method, url, headers=self.headers, **kwargs
+                )
 
-        if response.content:
-            return status_code, response.json()
-        return status_code, None
+                # retry on rate limit or server error
+                if response.status_code in (429, 503, 502, 504):
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2**attempt)
+                        continue
+
+                response.raise_for_status()
+
+                status_code = response.status_code
+                if not status_code:
+                    raise ValueError("Status code should not be None")
+
+                if response.content:
+                    return status_code, response.json()
+                return status_code, None
+
+            except (ConnectionError, TimeoutError):
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2**attempt)
+                    continue
+                raise
+
+        # should never reach here, but satisfy type checker
+        raise RuntimeError("Max retries exceeded")
 
     async def health(self) -> bool:
         """Check server health and API key."""
