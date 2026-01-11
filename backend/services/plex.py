@@ -61,6 +61,26 @@ class PlexBackend:
         except Exception:
             return False
 
+    async def _get_media_libraries(self, media_type: str) -> list[dict[str, str]]:
+        """Get list of media libraries of a specific type with their IDs and names."""
+        virtual_folders = await self._make_request("library/sections/all")  # pyright: ignore [reportAttributeAccessIssue]
+        media_libs = []
+        for section in virtual_folders.get("MediaContainer", {}).get("Directory", []):  # pyright: ignore [reportAttributeAccessIssue]
+            if section.get("type") == media_type:
+                item_id = section.get("uuid")
+                name = section.get("title")
+                if item_id and name:
+                    media_libs.append({"id": item_id, "name": name})
+        return media_libs
+
+    async def get_movie_libraries(self) -> list[dict[str, str]]:
+        """Get list of movie libraries with their IDs and names."""
+        return await self._get_media_libraries("movie")
+
+    async def get_series_libraries(self) -> list[dict[str, str]]:
+        """Get list of TV series libraries with their IDs and names."""
+        return await self._get_media_libraries("show")
+
     async def get_library_sections(self) -> list[dict]:
         """Get all library sections."""
         data = await self._make_request("library/sections")
