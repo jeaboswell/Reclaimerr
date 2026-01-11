@@ -19,7 +19,7 @@ from backend.models.media import AggregatedMovieData, AggregatedSeriesData, Exte
 class JellyfinBackend:
     """Jellyfin media server backend."""
 
-    def __init__(self, api_key: str, jellyfin_url: str):
+    def __init__(self, api_key: str, jellyfin_url: str) -> None:
         self.api_key = api_key
         self.jellyfin_url = jellyfin_url
         self.session = niquests.AsyncSession()
@@ -34,7 +34,9 @@ class JellyfinBackend:
         # cache of virtual folders for path-based lookup
         self._virtual_folders: list[dict] | None = None
 
-    async def _make_request(self, endpoint: str, params: dict | None = None):
+    async def _make_request(
+        self, endpoint: str, params: dict | None = None
+    ) -> list | dict:
         max_retries = 3
 
         for attempt in range(max_retries):
@@ -53,17 +55,20 @@ class JellyfinBackend:
                 response.raise_for_status()
                 return response.json()
 
-            except (ConnectionError, TimeoutError) as e:
+            except (ConnectionError, TimeoutError):
                 if attempt < max_retries - 1:
                     await asyncio.sleep(2**attempt)
                     continue
                 raise
 
+        # should never reach here, but satisfy type checker
+        raise RuntimeError("Max retries exceeded")
+
     async def _get_virtual_folders(self) -> list[dict]:
         """Get and cache virtual folders (libraries)."""
         if self._virtual_folders is None:
-            self._virtual_folders = await self._make_request("Library/VirtualFolders")
-        return self._virtual_folders  # type: ignore[return-value]
+            self._virtual_folders = await self._make_request("Library/VirtualFolders")  # pyright: ignore [reportAttributeAccessIssue]
+        return self._virtual_folders  # pyright: ignore [reportReturnType]
 
     async def _get_library_name_from_path(self, item_path: str) -> str:
         """Get library name by matching item path to virtual folder paths."""
@@ -131,7 +136,7 @@ class JellyfinBackend:
         get_data = await self._make_request("Items", params=params)
         if not get_data:
             return []
-        items_data = get_data.get("Items", [])
+        items_data = get_data.get("Items", [])  # pyright: ignore [reportAttributeAccessIssue]
         data = []
         for item in items_data:
             # get library information using path (most reliable)
@@ -200,7 +205,7 @@ class JellyfinBackend:
         get_data = await self._make_request("Items", params=params)
         if not get_data:
             return []
-        items_data = get_data.get("Items", [])
+        items_data = get_data.get("Items", [])  # pyright: ignore [reportAttributeAccessIssue]
         data = []
         for item in items_data:
             # get library information using path (most reliable)
@@ -273,7 +278,7 @@ class JellyfinBackend:
             get_data = await self._make_request("Items", params=params)
             if not get_data:
                 raise Exception("No data returned")
-            items_data = get_data.get("Items", [])
+            items_data = get_data.get("Items", [])  # pyright: ignore [reportAttributeAccessIssue]
 
             # group by series and keep the most recent watch date
             for item in items_data:
