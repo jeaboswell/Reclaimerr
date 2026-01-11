@@ -16,18 +16,21 @@ class PlexBackend:
     def __init__(self, token: str, plex_url: str):
         self.token = token
         self.plex_url = plex_url
-        self.headers = {
-            "X-Plex-Token": self.token,
-            "Accept": "application/json",
-        }
+        self.session = niquests.AsyncSession()
+        self.session.headers.update(
+            {
+                "X-Plex-Token": self.token,
+                "Accept": "application/json",
+            }
+        )
 
     async def _make_request(self, endpoint: str, params: dict | None = None):
         max_retries = 3
 
         for attempt in range(max_retries):
             try:
-                response = await niquests.aget(
-                    f"{self.plex_url}/{endpoint}", params=params, headers=self.headers
+                response = await self.session.get(
+                    f"{self.plex_url}/{endpoint}", params=params
                 )
 
                 # retry on rate limit or server error

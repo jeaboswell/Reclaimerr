@@ -22,10 +22,13 @@ class JellyfinBackend:
     def __init__(self, api_key: str, jellyfin_url: str):
         self.api_key = api_key
         self.jellyfin_url = jellyfin_url
-        self.headers = {
-            "X-Emby-Token": self.api_key,
-            "accept": "application/json",
-        }
+        self.session = niquests.AsyncSession()
+        self.session.headers.update(
+            {
+                "X-Emby-Token": self.api_key,
+                "accept": "application/json",
+            }
+        )
         # cache library information - map folder IDs to library names
         self._library_cache: dict[str, str] = {}
         # cache of virtual folders for path-based lookup
@@ -36,10 +39,9 @@ class JellyfinBackend:
 
         for attempt in range(max_retries):
             try:
-                response = await niquests.aget(
+                response = await self.session.get(
                     f"{self.jellyfin_url}/{endpoint}",
                     params=params,
-                    headers=self.headers,
                 )
 
                 # retry on rate limit or server error

@@ -47,10 +47,13 @@ class SonarrClient:
         """
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
-        self.headers = {
-            "X-Api-Key": self.api_key,
-            "Content-Type": "application/json",
-        }
+        self.session = niquests.AsyncSession()
+        self.session.headers.update(
+            {
+                "X-Api-Key": self.api_key,
+                "Content-Type": "application/json",
+            }
+        )
 
     async def _make_request(
         self, method: str, endpoint: str, **kwargs
@@ -65,9 +68,7 @@ class SonarrClient:
 
         for attempt in range(max_retries):
             try:
-                response = await niquests.arequest(
-                    method, url, headers=self.headers, **kwargs
-                )
+                response = await self.session.request(method, url, **kwargs)
 
                 # retry on rate limit or server error
                 if response.status_code in (429, 503, 502, 504):
