@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     Enum,
@@ -45,6 +46,8 @@ class ServiceConfig(Base):
     base_url: Mapped[str] = mapped_column(String(255))
     api_key: Mapped[str] = mapped_column(String(255))
     enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    # service specific settings
+    extra_settings: Mapped[dict | None] = mapped_column(JSON, default=None, init=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         server_default=func.now(),

@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel
 
 from backend.enums import Service
@@ -8,3 +10,4 @@ class ServiceConfigUpdate(BaseModel):
     base_url: str
     api_key: str
     enabled: bool
+    extra_settings: dict[Any, Any] | None = None

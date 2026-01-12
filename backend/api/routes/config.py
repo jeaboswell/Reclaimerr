@@ -4,8 +4,8 @@ from sqlalchemy import insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.core.clients import client_manager
 from backend.core.logger import LOG
+from backend.core.service_manager import client_manager
 from backend.core.settings import settings
 from backend.database.database import get_db
 from backend.database.models import ServiceConfig
@@ -15,9 +15,9 @@ from backend.models.config import ServiceConfigUpdate
 router = APIRouter(prefix="/api/config", tags=["Configuration"])
 
 
-# def get_clients() -> ClientManager:
-#     """FastAPI dependency to get ClientManager instance."""
-#     from backend.core.clients import get_client_manager
+# def get_clients() -> ServiceManager:
+#     """FastAPI dependency to get ServiceManager instance."""
+#     from backend.core.service_manager import get_client_manager
 #     return get_client_manager()
 
 
@@ -44,55 +44,56 @@ router = APIRouter(prefix="/api/config", tags=["Configuration"])
 
 @router.post("/clients/update")
 async def update_client_config(
-    data: ServiceConfigUpdate, 
-    db: AsyncSession = Depends(get_db)
+    data: ServiceConfigUpdate, db: AsyncSession = Depends(get_db)
 ):
     """Update service configuration and reinitialize client."""
     LOG.info(f"Updating config for {data.service_type}")
-    
+
     # upsert into database
     insert_statement = sqlite_insert(ServiceConfig).values(
         service_type=data.service_type,
         base_url=data.base_url,
         api_key=data.api_key,
         enabled=data.enabled,
+        extra_settings=data.extra_settings,
     )
     upsert_statement = insert_statement.on_conflict_do_update(
-        index_elements=['service_type'],
+        index_elements=["service_type"],
         set_={
-            'base_url': data.base_url,
-            'api_key': data.api_key,
-            'enabled': data.enabled,
-        }
+            "base_url": data.base_url,
+            "api_key": data.api_key,
+            "enabled": data.enabled,
+            "extra_settings": data.extra_settings,
+        },
     )
-    
+
     await db.execute(upsert_statement)
-    
+
     # reinitialize the client if needed
     if data.enabled:
         if data.service_type is Service.JELLYFIN:
-            client_manager.clear_jellyfin()
-            client_manager.initialize_jellyfin(data.base_url, data.api_key)
+            await client_manager.clear_jellyfin()
+            await client_manager.initialize_jellyfin(data.base_url, data.api_key)
         elif data.service_type is Service.PLEX:
-            client_manager.clear_plex()
-            client_manager.initialize_plex(data.base_url, data.api_key)
+            await client_manager.clear_plex()
+            await client_manager.initialize_plex(data.base_url, data.api_key)
         elif data.service_type is Service.RADARR:
-            client_manager.clear_radarr()
-            client_manager.initialize_radarr(data.base_url, data.api_key)
+            await client_manager.clear_radarr()
+            await client_manager.initialize_radarr(data.base_url, data.api_key)
         elif data.service_type is Service.SONARR:
-            client_manager.clear_sonarr()
-            client_manager.initialize_sonarr(data.base_url, data.api_key)
+            await client_manager.clear_sonarr()
+            await client_manager.initialize_sonarr(data.base_url, data.api_key)
     else:
         # clear client if disabled
         if data.service_type is Service.JELLYFIN:
-            client_manager.clear_jellyfin()
+            await client_manager.clear_jellyfin()
         elif data.service_type is Service.PLEX:
-            client_manager.clear_plex()
+            await client_manager.clear_plex()
         elif data.service_type is Service.RADARR:
-            client_manager.clear_radarr()
+            await client_manager.clear_radarr()
         elif data.service_type is Service.SONARR:
-            client_manager.clear_sonarr()
-    
+            await client_manager.clear_sonarr()
+
     return {"success": True, "message": f"{data.service_type} config updated"}
 
     # if data.service_type is Service.JELLYFIN:
@@ -100,7 +101,7 @@ async def update_client_config(
 
 
 # @router.get("/clients/status", response_model=ClientsStatusResponse)
-# async def get_clients_status(clients: ClientManager = Depends(get_clients)):
+# async def get_clients_status(clients: ServiceManager = Depends(get_clients)):
 #     """Get status of all configured clients."""
 #     return ClientsStatusResponse(
 #         jellyfin={
@@ -122,7 +123,7 @@ async def update_client_config(
 
 
 # @router.post("/clients/reload", response_model=ReloadResponse)
-# async def reload_clients(clients: ClientManager = Depends(get_clients)):
+# async def reload_clients(clients: ServiceManager = Depends(get_clients)):
 #     """Reload all clients after configuration changes.
 
 #     Use this endpoint after updating environment variables or configuration
@@ -160,7 +161,7 @@ async def update_client_config(
 # @router.post("/clients/reload/{client_name}", response_model=ReloadResponse)
 # async def reload_specific_client(
 #     client_name: str,
-#     clients: ClientManager = Depends(get_clients),
+#     clients: ServiceManager = Depends(get_clients),
 # ):
 #     """Reload a specific client after configuration changes.
 
