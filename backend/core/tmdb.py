@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 
 from niquests import (
-    AsyncResponse,
     AsyncSession,
     ConnectionError,
     ConnectTimeout,
@@ -75,11 +74,11 @@ class AsyncTMDBClient:
                 resp = await self.session.request(
                     mode, f"{self.API_URL}/{endpoint}", **kwargs
                 )
-                if resp.status == 404:
+                if resp.status_code == 404:
                     LOG.debug(f"404 Not Found for {endpoint}, skipping retries.")
                     return False
                 resp.raise_for_status()
-                return await resp.json()
+                return resp.json()
             except (ConnectionError, ConnectTimeout) as e:
                 if attempt == MAX_RETRIES:
                     LOG.warning(f"Failed to get data from TMDB API ({endpoint} - {e}) ")
@@ -121,7 +120,7 @@ class AsyncTMDBClient:
         max_retries: int = 5,
         retry_delay: int = 2,
         **kwargs,
-    ) -> Response | AsyncResponse | None | bool:
+    ) -> Response | None | bool:
         """Make a single-shot TMDB API request without persistent session.
 
         Args:
@@ -132,7 +131,7 @@ class AsyncTMDBClient:
             retry_delay: Delay between retries in seconds
             **kwargs: Additional request parameters
         Returns:
-            AsyncResponse, None on failure, or False on 404
+            Response, None on failure, or False on 404
         """
         headers = {
             "Authorization": f"Bearer {bearer_token}",
@@ -143,7 +142,7 @@ class AsyncTMDBClient:
             try:
                 async with AsyncSession(headers=headers) as req:
                     resp = await req.request(mode, url, **kwargs)
-                    if resp.status == 404:
+                    if resp.status_code == 404:
                         LOG.debug(f"404 Not Found for {url}, skipping retries.")
                         return False
                     resp.raise_for_status()
