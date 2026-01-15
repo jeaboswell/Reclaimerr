@@ -24,6 +24,7 @@ def build_sonarr_series_from_dict(data: dict) -> SonarrSeries:
         id=data["id"],
         title=data.get("title", ""),
         tvdb_id=data.get("tvdbId"),
+        tmdb_id=data.get("tmdbId"),
         imdb_id=data.get("imdbId"),
         year=data.get("year"),
         path=data.get("path", ""),

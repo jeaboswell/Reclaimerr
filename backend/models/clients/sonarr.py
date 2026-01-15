@@ -19,6 +19,7 @@ class SonarrSeries:
     id: int
     title: str
     tvdb_id: int | None
+    tmdb_id: int | None
     imdb_id: str | None
     year: int | None
     path: str
@@ -30,6 +31,6 @@ class SonarrSeries:
 
     def __repr__(self) -> str:
         return (
-            f"SonarrSeries(id={self.id}, title='{self.title}', tvdb_id={self.tvdb_id}, "
+            f"SonarrSeries(id={self.id}, title='{self.title}', tvdb_id={self.tvdb_id}, tmdb_id={self.tmdb_id}, "
             f"year={self.year}, seasons={self.season_count}, monitored={self.monitored}, tags={self.tags})"
         )
