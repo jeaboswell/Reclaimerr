@@ -144,10 +144,11 @@ class JellyfinService:
             provider_ids = item.get("ProviderIds", {})
             external_ids = ExternalIDs(
                 imdb=provider_ids.get("Imdb"),
-                tmdb=provider_ids.get("Tmdb"),
+                tmdb=int(provider_ids.get("Tmdb")),
                 tmdb_collection=provider_ids.get("TmdbCollection"),
                 tvdb=provider_ids.get("Tvdb"),
             )
+            has_file = item.get("MediaSources")
             movie = JellyfinMovie(
                 id=item["Id"],
                 name=item["Name"],
@@ -163,7 +164,7 @@ class JellyfinService:
                 library_name=library_name,
                 external_ids=external_ids,
                 # we're just getting index 0 because there should only be one file
-                size=item["MediaSources"][0]["Size"],
+                size=item["MediaSources"][0]["Size"] if has_file else 0,
                 user_data=user_data,
             )
             data.append(movie)
@@ -174,6 +175,7 @@ class JellyfinService:
         user_id: str,
         library_id: str,
         library_name: str,
+        series_sizes: dict[str, int] | None = None,
         filters: dict | None = None,
     ) -> list[JellyfinSeries]:
         """Get TV series for a specific user, optionally filtered by library.
@@ -182,6 +184,7 @@ class JellyfinService:
             user_id: The Jellyfin user ID
             library_id: Library ID to query
             library_name: The name of the library
+            series_sizes: Pre-calculated series sizes (series_id -> total bytes)
             filters: Additional query filters
         """
         params = {
@@ -189,7 +192,7 @@ class JellyfinService:
             "includeItemTypes": "Series",
             "recursive": "true",
             "enableTotalRecordCount": "true",
-            "Fields": "ProviderIds,MediaSources",
+            "Fields": "ProviderIds",
             "ParentId": library_id,
         }
 
@@ -216,10 +219,14 @@ class JellyfinService:
             provider_ids = item.get("ProviderIds", {})
             external_ids = ExternalIDs(
                 imdb=provider_ids.get("Imdb"),
-                tmdb=provider_ids.get("Tmdb"),
+                tmdb=int(provider_ids.get("Tmdb")),
                 tmdb_collection=provider_ids.get("TmdbCollection"),
                 tvdb=provider_ids.get("Tvdb"),
             )
+
+            # get size from pre-calculated series sizes (if available)
+            total_size = series_sizes.get(item["Id"], 0) if series_sizes else 0
+
             series = JellyfinSeries(
                 id=item["Id"],
                 name=item["Name"],
@@ -233,11 +240,55 @@ class JellyfinService:
                 library_id=library_id,
                 library_name=library_name,
                 external_ids=external_ids,
-                size=sum(src["Size"] for src in item["MediaSources"]),
+                size=total_size,
                 user_data=user_data,
             )
             data.append(series)
         return data
+
+    async def get_series_sizes_for_library(
+        self, library_id: str, user_id: str
+    ) -> dict[str, int]:
+        """Get total sizes for all series in a library by fetching all episodes in one call.
+
+        Args:
+            library_id: The Jellyfin library ID
+            user_id: The user ID to fetch episodes for
+
+        Returns:
+            Dictionary mapping series_id to total size in bytes
+        """
+        params = {
+            "userId": user_id,
+            "includeItemTypes": "Episode",
+            "recursive": "true",
+            "Fields": "MediaSources,SeriesId",
+            "ParentId": library_id,
+        }
+
+        get_data = await self._make_request("Items", params=params)
+        if not get_data:
+            return {}
+
+        episodes = get_data.get("Items", [])  # pyright: ignore [reportAttributeAccessIssue]
+
+        # group episodes by series and sum sizes
+        series_sizes: dict[str, int] = {}
+        for episode in episodes:
+            series_id = episode.get("SeriesId")
+            if not series_id:
+                continue
+
+            episode_size = 0
+            media_sources = episode.get("MediaSources", [])
+            for source in media_sources:
+                episode_size += source.get("Size", 0)
+
+            if series_id not in series_sizes:
+                series_sizes[series_id] = 0
+            series_sizes[series_id] += episode_size
+
+        return series_sizes
 
     async def get_all_watched_episodes_for_user(
         self, user_id: str
@@ -382,7 +433,17 @@ class JellyfinService:
             library_id = library["id"]
             library_name = library["name"]
 
-            for user in await self.get_users():
+            # get first user to fetch series sizes (sizes are same for all users)
+            users = await self.get_users()
+            if not users:
+                continue
+
+            # fetch series sizes once per library (not per user as this is expensive)
+            series_sizes = await self.get_series_sizes_for_library(
+                library_id, users[0].id
+            )
+
+            for user in users:
                 # get all watched episodes for this user in one API call
                 user_series_watch_dates = await self.get_all_watched_episodes_for_user(
                     user.id
@@ -390,7 +451,10 @@ class JellyfinService:
 
                 # get series list for this user from this library
                 user_series = await self.get_series_for_user(
-                    user.id, library_id=library_id, library_name=library_name
+                    user.id,
+                    library_id=library_id,
+                    library_name=library_name,
+                    series_sizes=series_sizes,
                 )
 
                 for series in user_series:
