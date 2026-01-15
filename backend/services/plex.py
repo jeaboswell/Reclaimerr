@@ -88,6 +88,43 @@ class PlexService:
             return []
         return data.get("MediaContainer", {}).get("Directory", [])  # pyright: ignore [reportAttributeAccessIssue]
 
+    async def get_series_sizes_for_section(self, section_id: str) -> dict[str, int]:
+        """Get total sizes for all series in a library section by fetching all episodes in one call.
+
+        Args:
+            section_id: The Plex library section ID
+
+        Returns:
+            Dictionary mapping series rating key to total size in bytes
+        """
+        # type=4 fetches all episodes in the section
+        episodes_data = await self._make_request(
+            f"library/sections/{section_id}/all",
+            params={"type": 4},
+        )
+        if not episodes_data:
+            return {}
+
+        episodes = episodes_data.get("MediaContainer", {}).get("Metadata", [])  # pyright: ignore [reportAttributeAccessIssue]
+
+        # group episodes by grandparent (series) and sum sizes
+        series_sizes: dict[str, int] = {}
+        for episode in episodes:
+            series_key = episode.get("grandparentRatingKey")
+            if not series_key:
+                continue
+
+            episode_size = 0
+            for media in episode.get("Media", []):
+                for part in media.get("Part", []):
+                    episode_size += part.get("size", 0)
+
+            if series_key not in series_sizes:
+                series_sizes[series_key] = 0
+            series_sizes[series_key] += episode_size
+
+        return series_sizes
+
     async def get_movies(
         self, included_libraries: list[str] | None = None
     ) -> list[PlexMovie]:
@@ -129,6 +166,10 @@ class PlexService:
                     for part in media.get("Part", []):
                         total_size += part.get("size", 0)
 
+                ext_ids = self._parse_external_ids(item)
+                if not ext_ids:
+                    continue
+
                 movie = PlexMovie(
                     id=item["ratingKey"],
                     name=item.get("title", ""),
@@ -146,7 +187,7 @@ class PlexService:
                     if item.get("lastViewedAt")
                     else None,
                     view_count=item.get("viewCount", 0),
-                    external_ids=self._parse_external_ids(item),
+                    external_ids=ext_ids,
                     size=total_size,
                 )
                 all_movies.append(movie)
@@ -154,25 +195,29 @@ class PlexService:
         return all_movies
 
     async def get_series(
-        self, included_sections: list[str] | None = None
+        self, included_libraries: list[str] | None = None
     ) -> list[PlexSeries]:
         """Get all TV series from all show libraries.
 
         Args:
-            included_sections: List of section names to include (None for all)
+            included_libraries: List of library names to include (None for all)
         """
         sections = await self.get_library_sections()
         show_sections = [s for s in sections if s.get("type") == "show"]
 
-        if included_sections:
+        if included_libraries:
             show_sections = [
-                s for s in show_sections if s.get("title") in included_sections
+                s for s in show_sections if s.get("title") in included_libraries
             ]
 
         all_series = []
         for section in show_sections:
             section_id = section["key"]
             section_name = section.get("title", "Unknown")
+
+            # fetch all episode sizes for this section in one API call
+            series_sizes = await self.get_series_sizes_for_section(section_id)
+
             # type=2 to only fetch shows, not collections
             # includeGuids=1 to get external IDs
             items_data = await self._make_request(
@@ -188,21 +233,12 @@ class PlexService:
                 if item.get("type") != "show":
                     continue
 
-                # calculate total size by fetching all episodes and summing their sizes
-                total_size = 0
-                show_rating_key = item["ratingKey"]
-                # fetch all episodes for this show using the allLeaves endpoint
-                episodes_data = await self._make_request(
-                    f"library/metadata/{show_rating_key}/allLeaves"
-                )
-                if episodes_data:
-                    episodes = episodes_data.get("MediaContainer", {}).get(  # pyright: ignore [reportAttributeAccessIssue]
-                        "Metadata", []
-                    )
-                    for episode in episodes:
-                        for media in episode.get("Media", []):
-                            for part in media.get("Part", []):
-                                total_size += part.get("size", 0)
+                # get size from pre-calculated series sizes
+                total_size = series_sizes.get(str(item["ratingKey"]), 0)
+
+                ext_ids = self._parse_external_ids(item)
+                if not ext_ids:
+                    continue
 
                 series = PlexSeries(
                     id=item["ratingKey"],
@@ -221,7 +257,7 @@ class PlexService:
                     if item.get("lastViewedAt")
                     else None,
                     view_count=item.get("viewCount", 0),
-                    external_ids=self._parse_external_ids(item),
+                    external_ids=ext_ids,
                     size=total_size,
                 )
                 all_series.append(series)
@@ -255,10 +291,10 @@ class PlexService:
         ]
 
     async def get_aggregated_series(
-        self, included_sections: list[str] | None = None
+        self, included_libraries: list[str] | None = None
     ) -> list[AggregatedSeriesData]:
         """Get aggregated series data with optional section inclusion."""
-        series = await self.get_series(included_sections=included_sections)
+        series = await self.get_series(included_libraries=included_libraries)
 
         return [
             AggregatedSeriesData(
@@ -290,7 +326,7 @@ class PlexService:
             if guid_id.startswith("imdb://"):
                 imdb_id = guid_id.replace("imdb://", "")
             elif guid_id.startswith("tmdb://"):
-                tmdb_id = guid_id.replace("tmdb://", "")
+                tmdb_id = int(guid_id.replace("tmdb://", ""))
             elif guid_id.startswith("tvdb://"):
                 tvdb_id = guid_id.replace("tvdb://", "")
 
