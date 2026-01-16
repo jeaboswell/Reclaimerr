@@ -346,9 +346,21 @@ async def _sync_radarr_tags() -> tuple[int, int]:
     if not service_manager.radarr:
         return 0, 0
 
-    # get or create the cleanup tag
+    # get all tags to detect old cleanup tags
+    all_tags = await service_manager.radarr.get_tags()
+
+    # get or create the current cleanup tag
     tag = await service_manager.radarr.get_or_create_tag(settings.cleanup_tag)
     LOG.debug(f"Using Radarr tag '{tag.label}' (ID: {tag.id})")
+
+    # find old vacuumarr tags (starts with 'vacuumarr' but isn't current tag)
+    old_tags = [
+        t for t in all_tags if t.label.startswith("vacuumarr") and t.id != tag.id
+    ]
+    if old_tags:
+        LOG.info(
+            f"Found {len(old_tags)} old cleanup tags to migrate: {[t.label for t in old_tags]}"
+        )
 
     # get all movies from Radarr
     all_movies = await service_manager.radarr.get_all_movies()
@@ -370,8 +382,9 @@ async def _sync_radarr_tags() -> tuple[int, int]:
     LOG.debug(f"Found {len(candidate_radarr_ids)} movie candidates with Radarr IDs")
 
     # determine which movies need tagging/un-tagging
-    movies_to_tag = []  # candidates without tag
-    movies_to_untag = []  # non-candidates with tag
+    movies_to_tag = []  # candidates without current tag
+    movies_to_untag = []  # non-candidates with current tag
+    movies_with_old_tags = {}  # movies with old tags: {old_tag_id: [movie_ids]}
 
     for radarr_id, movie in movies_by_id.items():
         has_tag = tag.id in movie.tags
@@ -382,16 +395,31 @@ async def _sync_radarr_tags() -> tuple[int, int]:
         elif not should_have_tag and has_tag:
             movies_to_untag.append(radarr_id)
 
+        # check for old cleanup tags that need removal
+        for old_tag in old_tags:
+            if old_tag.id in movie.tags:
+                if old_tag.id not in movies_with_old_tags:
+                    movies_with_old_tags[old_tag.id] = []
+                movies_with_old_tags[old_tag.id].append(radarr_id)
+
     LOG.debug(
         f"Need to tag {len(movies_to_tag)} movies, untag {len(movies_to_untag)} movies"
     )
 
-    # apply tags in bulk
+    # clean up old cleanup tags first (migration)
+    for old_tag_id, movie_ids in movies_with_old_tags.items():
+        old_tag_label = next(
+            (t.label for t in old_tags if t.id == old_tag_id), "unknown"
+        )
+        await service_manager.radarr.remove_tag_from_movies(movie_ids, old_tag_id)
+        LOG.info(f"Removed old tag '{old_tag_label}' from {len(movie_ids)} movies")
+
+    # apply current tags in bulk
     if movies_to_tag:
         await service_manager.radarr.add_tag_to_movies(movies_to_tag, tag.id)
         LOG.info(f"Tagged {len(movies_to_tag)} movies in Radarr")
 
-    # remove tags in bulk
+    # remove current tags from non-candidates in bulk
     if movies_to_untag:
         await service_manager.radarr.remove_tag_from_movies(movies_to_untag, tag.id)
         LOG.info(f"Untagged {len(movies_to_untag)} movies in Radarr")
@@ -404,9 +432,21 @@ async def _sync_sonarr_tags() -> tuple[int, int]:
     if not service_manager.sonarr:
         return 0, 0
 
-    # get or create the cleanup tag
+    # get all tags to detect old cleanup tags
+    all_tags = await service_manager.sonarr.get_tags()
+
+    # get or create the current cleanup tag
     tag = await service_manager.sonarr.get_or_create_tag(settings.cleanup_tag)
     LOG.debug(f"Using Sonarr tag '{tag.label}' (ID: {tag.id})")
+
+    # find old vacuumarr tags (starts with 'vacuumarr' but isn't current tag)
+    old_tags = [
+        t for t in all_tags if t.label.startswith("vacuumarr") and t.id != tag.id
+    ]
+    if old_tags:
+        LOG.info(
+            f"Found {len(old_tags)} old cleanup tags to migrate: {[t.label for t in old_tags]}"
+        )
 
     # get all series from Sonarr
     all_series = await service_manager.sonarr.get_all_series()
@@ -428,8 +468,9 @@ async def _sync_sonarr_tags() -> tuple[int, int]:
     LOG.debug(f"Found {len(candidate_sonarr_ids)} series candidates with Sonarr IDs")
 
     # determine which series need tagging/un-tagging
-    series_to_tag = []  # candidates without tag
-    series_to_untag = []  # non-candidates with tag
+    series_to_tag = []  # candidates without current tag
+    series_to_untag = []  # non-candidates with current tag
+    series_with_old_tags = {}  # series with old tags: {old_tag_id: [series_ids]}
 
     for sonarr_id, series in series_by_id.items():
         has_tag = tag.id in series.tags
@@ -440,16 +481,31 @@ async def _sync_sonarr_tags() -> tuple[int, int]:
         elif not should_have_tag and has_tag:
             series_to_untag.append(sonarr_id)
 
+        # check for old cleanup tags that need removal
+        for old_tag in old_tags:
+            if old_tag.id in series.tags:
+                if old_tag.id not in series_with_old_tags:
+                    series_with_old_tags[old_tag.id] = []
+                series_with_old_tags[old_tag.id].append(sonarr_id)
+
     LOG.debug(
         f"Need to tag {len(series_to_tag)} series, untag {len(series_to_untag)} series"
     )
 
-    # apply tags in bulk
+    # clean up old cleanup tags first (migration)
+    for old_tag_id, series_ids in series_with_old_tags.items():
+        old_tag_label = next(
+            (t.label for t in old_tags if t.id == old_tag_id), "unknown"
+        )
+        await service_manager.sonarr.remove_tag_from_series(series_ids, old_tag_id)
+        LOG.info(f"Removed old tag '{old_tag_label}' from {len(series_ids)} series")
+
+    # apply current tags in bulk
     if series_to_tag:
         await service_manager.sonarr.add_tag_to_series(series_to_tag, tag.id)
         LOG.info(f"Tagged {len(series_to_tag)} series in Sonarr")
 
-    # remove tags in bulk
+    # remove current tags from non-candidates in bulk
     if series_to_untag:
         await service_manager.sonarr.remove_tag_from_series(series_to_untag, tag.id)
         LOG.info(f"Untagged {len(series_to_untag)} series in Sonarr")
