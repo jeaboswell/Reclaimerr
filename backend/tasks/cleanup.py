@@ -87,6 +87,30 @@ async def _process_media(
 
     LOG.info(f"Processing {len(media_items)} {media_type.value} items")
 
+    # fetch all existing candidates for this media type once (avoid N queries in loop)
+    if media_type is MediaType.MOVIE:
+        result = await db.execute(
+            select(CleanupCandidate).where(
+                CleanupCandidate.media_type == MediaType.MOVIE
+            )
+        )
+    else:
+        result = await db.execute(
+            select(CleanupCandidate).where(
+                CleanupCandidate.media_type == MediaType.SERIES
+            )
+        )
+    existing_candidates = result.scalars().all()
+
+    # build lookup - movie_id/series_id -> candidate
+    candidate_lookup = {}
+    for candidate in existing_candidates:
+        key = (
+            candidate.movie_id if media_type is MediaType.MOVIE else candidate.series_id
+        )
+        if key:
+            candidate_lookup[key] = candidate
+
     candidates_created = 0
     candidates_updated = 0
 
@@ -102,11 +126,8 @@ async def _process_media(
 
         # if item matches at least one rule, create/update candidate
         if matched_rules:
-            # check if candidate already exists
-            result = await db.execute(
-                select(CleanupCandidate).where(CleanupCandidate.id == item.id)
-            )
-            existing = result.scalar_one_or_none()
+            # check if candidate already exists using lookup dict
+            existing = candidate_lookup.get(item.id)
 
             combined_reason = "; ".join(reasons)
 
@@ -119,7 +140,6 @@ async def _process_media(
                 existing.matched_criteria = matched_criteria
                 existing.reason = combined_reason
                 existing.estimated_space_gb = space_gb
-                existing.library_name = item.library_name
                 existing.updated_at = datetime.now(timezone.utc)
                 candidates_updated += 1
             else:
@@ -130,7 +150,6 @@ async def _process_media(
                     "matched_criteria": matched_criteria,
                     "reason": combined_reason,
                     "estimated_space_gb": space_gb,
-                    "library_name": item.library_name,
                 }
                 if id_field == "movie_id":
                     candidate_data["movie_id"] = item.id
@@ -162,7 +181,7 @@ def _evaluate_rule(
     # validate rule has at least one criterion set
     has_criteria = any(
         (
-            rule.library_name is not None,
+            rule.library_names is not None,
             rule.min_popularity is not None,
             rule.max_popularity is not None,
             rule.min_vote_average is not None,
@@ -189,9 +208,15 @@ def _evaluate_rule(
     if not item.size or item.size == 0:
         return False
 
-    # check library filtering
-    if rule.library_name is not None and (item.library_name != rule.library_name):
-        return False
+    # check library filtering - check both plex and jellyfin library names
+    if rule.library_names is not None and len(rule.library_names) > 0:
+        item_libraries = [
+            lib
+            for lib in (item.plex_library_name, item.jellyfin_library_name)
+            if lib is not None
+        ]
+        if not any(lib in rule.library_names for lib in item_libraries):
+            return False
 
     # check popularity
     if rule.min_popularity is not None and (
@@ -511,3 +536,626 @@ async def _sync_sonarr_tags() -> tuple[int, int]:
         LOG.info(f"Untagged {len(series_to_untag)} series in Sonarr")
 
     return len(series_to_tag), len(series_to_untag)
+
+
+async def delete_cleanup_candidates() -> None:
+    """Delete all cleanup candidates from their respective services.
+
+    Deletion is based purely on CleanupCandidate records in the database.
+    Tags are optional visual indicators only and do not affect deletion.
+
+    Deletion priority:
+    1. Use Radarr (movies) or Sonarr (series) if item has radarr_id/sonarr_id
+    2. Fall back to Jellyfin if configured
+    3. Fall back to Plex if configured
+
+    After deletion, resets the request in Seerr and marks item as removed in database.
+    """
+    LOG.info("Starting cleanup candidate deletion")
+
+    try:
+        movies_deleted = 0
+        series_deleted = 0
+
+        # process movies
+        if service_manager.radarr or service_manager.jellyfin or service_manager.plex:
+            movies_deleted = await _delete_movie_candidates()
+
+        # process series
+        if service_manager.sonarr or service_manager.jellyfin or service_manager.plex:
+            series_deleted = await _delete_series_candidates()
+
+        LOG.info(
+            f"Deletion completed: {movies_deleted} movies, {series_deleted} series removed"
+        )
+
+    except Exception as e:
+        LOG.error(f"Error deleting cleanup candidates: {e}", exc_info=True)
+        raise
+
+
+async def _delete_movie_candidates() -> int:
+    """Delete movie candidates. Returns count of deleted movies."""
+    deleted_count = 0
+
+    # get all movie candidates from database
+    async with async_db() as db:
+        result = await db.execute(
+            select(CleanupCandidate)
+            .join(Movie, CleanupCandidate.movie_id == Movie.id)
+            .where(CleanupCandidate.media_type == MediaType.MOVIE)
+            .where(Movie.removed_at.is_(None))
+        )
+        candidates = result.scalars().all()
+
+        if not candidates:
+            LOG.debug("No movie candidates to delete")
+            return 0
+
+        LOG.info(f"Found {len(candidates)} movie candidates to evaluate for deletion")
+
+        # get radarr IDs and build lookup
+        result = await db.execute(
+            select(Movie.id, Movie.radarr_id, Movie.title, Movie.tmdb_id)
+            .join(CleanupCandidate, Movie.id == CleanupCandidate.movie_id)
+            .where(CleanupCandidate.media_type == MediaType.MOVIE)
+            .where(Movie.removed_at.is_(None))
+        )
+        movie_data = {
+            row[0]: {"radarr_id": row[1], "title": row[2], "tmdb_id": row[3]}
+            for row in result.all()
+        }
+
+    # delete all candidates that exist in Radarr (by radarr_id)
+    movies_to_delete = []
+    if service_manager.radarr:
+        for candidate in candidates:
+            movie_info = movie_data.get(candidate.movie_id)
+            if movie_info and movie_info["radarr_id"]:
+                movies_to_delete.append(
+                    {
+                        "candidate_id": candidate.id,
+                        "movie_id": candidate.movie_id,
+                        "radarr_id": movie_info["radarr_id"],
+                        "title": movie_info["title"],
+                        "method": "radarr",
+                        "tmdb_id": movie_info["tmdb_id"],
+                    }
+                )
+
+    # delete using Radarr
+    if movies_to_delete and service_manager.radarr:
+        LOG.info(f"Deleting {len(movies_to_delete)} movies via Radarr")
+        radarr_ids = [m["radarr_id"] for m in movies_to_delete]
+
+        try:
+            await service_manager.radarr.delete_movies(radarr_ids)
+
+            # mark as removed in database and delete candidate
+            async with async_db() as db:
+                for movie_info in movies_to_delete:
+                    # update movie record
+                    result = await db.execute(
+                        select(Movie).where(Movie.id == movie_info["movie_id"])
+                    )
+                    movie = result.scalar_one_or_none()
+                    if movie:
+                        movie.removed_at = datetime.now(timezone.utc)
+
+                    # delete cleanup candidate
+                    result = await db.execute(
+                        select(CleanupCandidate).where(
+                            CleanupCandidate.id == movie_info["candidate_id"]
+                        )
+                    )
+                    candidate = result.scalar_one_or_none()
+                    if candidate:
+                        await db.delete(candidate)
+
+                    # reset seerr request if available
+                    movie_tmdb_id = movie_info.get("tmdb_id")
+                    if service_manager.seerr and movie and movie_tmdb_id:
+                        try:
+                            await _reset_seerr_request(movie_tmdb_id, MediaType.MOVIE)
+                        except Exception as e:
+                            LOG.warning(
+                                f"Failed to reset Seerr request for {movie_info['title']}: {e}"
+                            )
+
+                await db.commit()
+
+            deleted_count = len(movies_to_delete)
+            LOG.info(f"Successfully deleted {deleted_count} movies via Radarr")
+
+        except Exception as e:
+            LOG.error(f"Error deleting movies via Radarr: {e}", exc_info=True)
+
+    # fallback to Jellyfin/Plex for candidates not in Radarr
+    if not movies_to_delete or (len(candidates) > len(movies_to_delete)):
+        deleted_count += await _delete_movies_via_media_server(
+            candidates, movies_to_delete
+        )
+
+    return deleted_count
+
+
+async def _delete_series_candidates() -> int:
+    """Delete series candidates. Returns count of deleted series."""
+    deleted_count = 0
+
+    # get all series candidates from database
+    async with async_db() as db:
+        result = await db.execute(
+            select(CleanupCandidate)
+            .join(Series, CleanupCandidate.series_id == Series.id)
+            .where(CleanupCandidate.media_type == MediaType.SERIES)
+            .where(Series.removed_at.is_(None))
+        )
+        candidates = result.scalars().all()
+
+        if not candidates:
+            LOG.debug("No series candidates to delete")
+            return 0
+
+        LOG.info(f"Found {len(candidates)} series candidates to evaluate for deletion")
+
+        # get sonarr IDs and build lookup
+        result = await db.execute(
+            select(Series.id, Series.sonarr_id, Series.title, Series.tmdb_id)
+            .join(CleanupCandidate, Series.id == CleanupCandidate.series_id)
+            .where(CleanupCandidate.media_type == MediaType.SERIES)
+            .where(Series.removed_at.is_(None))
+        )
+        series_data = {
+            row[0]: {"sonarr_id": row[1], "title": row[2], "tmdb_id": row[3]}
+            for row in result.all()
+        }
+
+    # delete all candidates that exist in Sonarr (by sonarr_id)
+    series_to_delete = []
+    if service_manager.sonarr:
+        for candidate in candidates:
+            series_info = series_data.get(candidate.series_id)
+            if series_info and series_info["sonarr_id"]:
+                series_to_delete.append(
+                    {
+                        "candidate_id": candidate.id,
+                        "series_id": candidate.series_id,
+                        "sonarr_id": series_info["sonarr_id"],
+                        "title": series_info["title"],
+                        "method": "sonarr",
+                        "tmdb_id": series_info["tmdb_id"],
+                    }
+                )
+
+    # delete using Sonarr
+    if series_to_delete and service_manager.sonarr:
+        LOG.info(f"Deleting {len(series_to_delete)} series via Sonarr")
+
+        try:
+            # Sonarr deletes one at a time (no bulk endpoint)
+            for series_info in series_to_delete:
+                await service_manager.sonarr.delete_series(
+                    series_info["sonarr_id"], delete_files=True
+                )
+
+            # mark as removed in database and delete candidate
+            async with async_db() as db:
+                for series_info in series_to_delete:
+                    # update series record
+                    result = await db.execute(
+                        select(Series).where(Series.id == series_info["series_id"])
+                    )
+                    series = result.scalar_one_or_none()
+                    if series:
+                        series.removed_at = datetime.now(timezone.utc)
+
+                    # delete cleanup candidate
+                    result = await db.execute(
+                        select(CleanupCandidate).where(
+                            CleanupCandidate.id == series_info["candidate_id"]
+                        )
+                    )
+                    candidate = result.scalar_one_or_none()
+                    if candidate:
+                        await db.delete(candidate)
+
+                    # reset seerr request if available
+                    series_tmdb_id = series_info.get("tmdb_id")
+                    if service_manager.seerr and series and series_tmdb_id:
+                        try:
+                            await _reset_seerr_request(series_tmdb_id, MediaType.SERIES)
+                        except Exception as e:
+                            LOG.warning(
+                                f"Failed to reset Seerr request for {series_info['title']}: {e}"
+                            )
+
+                await db.commit()
+
+            deleted_count = len(series_to_delete)
+            LOG.info(f"Successfully deleted {deleted_count} series via Sonarr")
+
+        except Exception as e:
+            LOG.error(f"Error deleting series via Sonarr: {e}", exc_info=True)
+
+    # fallback to Jellyfin/Plex for candidates not in Sonarr
+    if not series_to_delete or (len(candidates) > len(series_to_delete)):
+        deleted_count += await _delete_series_via_media_server(
+            candidates, series_to_delete
+        )
+
+    return deleted_count
+
+
+async def _delete_movies_via_media_server(
+    candidates, already_deleted: list[dict]
+) -> int:
+    """Delete movies via Jellyfin or Plex as fallback when not in Radarr.
+
+    Args:
+        candidates: All movie candidates
+        already_deleted: List of movies already deleted via Radarr
+
+    Returns:
+        Count of movies deleted via media servers
+    """
+    already_deleted_ids = {m["movie_id"] for m in already_deleted}
+    remaining_candidates = [
+        c for c in candidates if c.movie_id and c.movie_id not in already_deleted_ids
+    ]
+
+    if not remaining_candidates:
+        return 0
+
+    LOG.info(
+        f"Attempting to delete {len(remaining_candidates)} movies via media servers (not in Radarr)"
+    )
+    deleted_count = 0
+
+    # get movies from database to access service IDs
+    async with async_db() as db:
+        movie_ids = [c.movie_id for c in remaining_candidates]
+        result = await db.execute(select(Movie).where(Movie.id.in_(movie_ids)))
+        movies = {m.id: m for m in result.scalars().all()}
+
+    # prioritize Jellyfin over Plex
+    if service_manager.jellyfin:
+        deleted_paths = []  # track paths of deleted movies for scanning
+
+        for candidate in remaining_candidates:
+            movie = movies.get(candidate.movie_id)
+            if not movie or not movie.tmdb_id:
+                continue
+
+            # use stored jellyfin_id directly
+            if not movie.jellyfin_id:
+                LOG.debug(f"Movie '{movie.title}' not found in Jellyfin (no ID stored)")
+                continue
+
+            try:
+                await service_manager.jellyfin.delete_item(movie.jellyfin_id)
+
+                # track service-specific path for scanning (from database)
+                if movie.jellyfin_path:
+                    deleted_paths.append(movie.jellyfin_path)
+
+                # mark as removed and delete candidate
+                async with async_db() as db:
+                    result = await db.execute(
+                        select(Movie).where(Movie.id == candidate.movie_id)
+                    )
+                    movie_obj = result.scalar_one_or_none()
+                    if movie_obj:
+                        movie_obj.removed_at = datetime.now(timezone.utc)
+
+                    result = await db.execute(
+                        select(CleanupCandidate).where(
+                            CleanupCandidate.id == candidate.id
+                        )
+                    )
+                    cand = result.scalar_one_or_none()
+                    if cand:
+                        await db.delete(cand)
+
+                    # reset seerr request
+                    if service_manager.seerr and movie.tmdb_id:
+                        try:
+                            await _reset_seerr_request(movie.tmdb_id, MediaType.MOVIE)
+                        except Exception as e:
+                            LOG.warning(
+                                f"Failed to reset Seerr request for {movie.title}: {e}"
+                            )
+
+                    await db.commit()
+
+                deleted_count += 1
+                LOG.info(f"Deleted movie '{movie.title}' via Jellyfin")
+
+            except Exception as e:
+                LOG.error(f"Failed to delete movie '{movie.title}' via Jellyfin: {e}")
+
+        # trigger path-specific library scans after all deletions
+        if deleted_paths:
+            LOG.info(
+                f"Triggering Jellyfin scans for {len(deleted_paths)} deleted movie paths"
+            )
+            for path in deleted_paths:
+                try:
+                    await service_manager.jellyfin.refresh_item_path(path)
+                except Exception as e:
+                    LOG.warning(f"Failed to trigger Jellyfin scan for {path}: {e}")
+
+    elif service_manager.plex:
+        deleted_paths = []  # track paths of deleted movies for scanning
+
+        for candidate in remaining_candidates:
+            movie = movies.get(candidate.movie_id)
+            if not movie or not movie.tmdb_id:
+                continue
+
+            # use stored plex_id directly
+            if not movie.plex_id:
+                LOG.debug(f"Movie '{movie.title}' not found in Plex (no ID stored)")
+                continue
+
+            try:
+                await service_manager.plex.delete_item(movie.plex_id)
+
+                # track service-specific path for scanning (from database)
+                if movie.plex_path:
+                    deleted_paths.append(movie.plex_path)
+
+                # mark as removed and delete candidate
+                async with async_db() as db:
+                    result = await db.execute(
+                        select(Movie).where(Movie.id == candidate.movie_id)
+                    )
+                    movie_obj = result.scalar_one_or_none()
+                    if movie_obj:
+                        movie_obj.removed_at = datetime.now(timezone.utc)
+
+                    result = await db.execute(
+                        select(CleanupCandidate).where(
+                            CleanupCandidate.id == candidate.id
+                        )
+                    )
+                    cand = result.scalar_one_or_none()
+                    if cand:
+                        await db.delete(cand)
+
+                    # reset seerr request
+                    if service_manager.seerr and movie.tmdb_id:
+                        try:
+                            await _reset_seerr_request(movie.tmdb_id, MediaType.MOVIE)
+                        except Exception as e:
+                            LOG.warning(
+                                f"Failed to reset Seerr request for {movie.title}: {e}"
+                            )
+
+                    await db.commit()
+
+                deleted_count += 1
+                LOG.info(f"Deleted movie '{movie.title}' via Plex")
+
+            except Exception as e:
+                LOG.error(f"Failed to delete movie '{movie.title}' via Plex: {e}")
+
+        # trigger path-specific library scans after all deletions
+        if deleted_paths:
+            LOG.info(
+                f"Triggering Plex scans for {len(deleted_paths)} deleted movie paths"
+            )
+            for path in deleted_paths:
+                try:
+                    await service_manager.plex.scan_item_path(path)
+                except Exception as e:
+                    LOG.warning(f"Failed to trigger Plex scan for {path}: {e}")
+
+    return deleted_count
+
+
+async def _delete_series_via_media_server(
+    candidates, already_deleted: list[dict]
+) -> int:
+    """Delete series via Jellyfin or Plex as fallback when not in Sonarr.
+
+    Args:
+        candidates: All series candidates
+        already_deleted: List of series already deleted via Sonarr
+
+    Returns:
+        Count of series deleted via media servers
+    """
+    already_deleted_ids = {s["series_id"] for s in already_deleted}
+    remaining_candidates = [
+        c for c in candidates if c.series_id and c.series_id not in already_deleted_ids
+    ]
+
+    if not remaining_candidates:
+        return 0
+
+    LOG.info(
+        f"Attempting to delete {len(remaining_candidates)} series via media servers (not in Sonarr)"
+    )
+    deleted_count = 0
+
+    # get series from database to access service IDs
+    async with async_db() as db:
+        series_ids = [c.series_id for c in remaining_candidates]
+        result = await db.execute(select(Series).where(Series.id.in_(series_ids)))
+        series = {s.id: s for s in result.scalars().all()}
+
+    # prioritize Jellyfin over Plex
+    if service_manager.jellyfin:
+        deleted_paths = []
+
+        for candidate in remaining_candidates:
+            series_obj = series.get(candidate.series_id)
+            if not series_obj or not series_obj.tmdb_id:
+                continue
+
+            # use stored jellyfin_id directly
+            if not series_obj.jellyfin_id:
+                LOG.debug(
+                    f"Series '{series_obj.title}' not found in Jellyfin (no ID stored)"
+                )
+                continue
+
+            try:
+                await service_manager.jellyfin.delete_item(series_obj.jellyfin_id)
+
+                # track service-specific path for scanning (from database)
+                if series_obj.jellyfin_path:
+                    deleted_paths.append(series_obj.jellyfin_path)
+
+                # mark as removed and delete candidate
+                async with async_db() as db:
+                    result = await db.execute(
+                        select(Series).where(Series.id == candidate.series_id)
+                    )
+                    series_db = result.scalar_one_or_none()
+                    if series_db:
+                        series_db.removed_at = datetime.now(timezone.utc)
+
+                    result = await db.execute(
+                        select(CleanupCandidate).where(
+                            CleanupCandidate.id == candidate.id
+                        )
+                    )
+                    cand = result.scalar_one_or_none()
+                    if cand:
+                        await db.delete(cand)
+
+                    # reset seerr request
+                    if service_manager.seerr and series_obj.tmdb_id:
+                        try:
+                            await _reset_seerr_request(
+                                series_obj.tmdb_id, MediaType.SERIES
+                            )
+                        except Exception as e:
+                            LOG.warning(
+                                f"Failed to reset Seerr request for {series_obj.title}: {e}"
+                            )
+
+                    await db.commit()
+
+                deleted_count += 1
+                LOG.info(f"Deleted series '{series_obj.title}' via Jellyfin")
+
+            except Exception as e:
+                LOG.error(
+                    f"Failed to delete series '{series_obj.title}' via Jellyfin: {e}"
+                )
+
+        # trigger path-specific library scans after all deletions
+        if deleted_paths:
+            LOG.info(
+                f"Triggering Jellyfin scans for {len(deleted_paths)} deleted series paths"
+            )
+            for path in deleted_paths:
+                try:
+                    await service_manager.jellyfin.refresh_item_path(path)
+                except Exception as e:
+                    LOG.warning(f"Failed to trigger Jellyfin scan for {path}: {e}")
+
+    elif service_manager.plex:
+        deleted_paths = []
+
+        for candidate in remaining_candidates:
+            series_obj = series.get(candidate.series_id)
+            if not series_obj or not series_obj.tmdb_id:
+                continue
+
+            # use stored plex_id directly
+            if not series_obj.plex_id:
+                LOG.debug(
+                    f"Series '{series_obj.title}' not found in Plex (no ID stored)"
+                )
+                continue
+
+            try:
+                await service_manager.plex.delete_item(series_obj.plex_id)
+
+                # track service-specific path for scanning (from database)
+                if series_obj.plex_path:
+                    deleted_paths.append(series_obj.plex_path)
+
+                # mark as removed and delete candidate
+                async with async_db() as db:
+                    result = await db.execute(
+                        select(Series).where(Series.id == candidate.series_id)
+                    )
+                    series_db = result.scalar_one_or_none()
+                    if series_db:
+                        series_db.removed_at = datetime.now(timezone.utc)
+
+                    result = await db.execute(
+                        select(CleanupCandidate).where(
+                            CleanupCandidate.id == candidate.id
+                        )
+                    )
+                    cand = result.scalar_one_or_none()
+                    if cand:
+                        await db.delete(cand)
+
+                    # reset seerr request
+                    if service_manager.seerr and series_obj.tmdb_id:
+                        try:
+                            await _reset_seerr_request(
+                                series_obj.tmdb_id, MediaType.SERIES
+                            )
+                        except Exception as e:
+                            LOG.warning(
+                                f"Failed to reset Seerr request for {series_obj.title}: {e}"
+                            )
+
+                    await db.commit()
+
+                deleted_count += 1
+                LOG.info(f"Deleted series '{series_obj.title}' via Plex")
+
+            except Exception as e:
+                LOG.error(f"Failed to delete series '{series_obj.title}' via Plex: {e}")
+
+        # trigger path-specific library scans after all deletions
+        if deleted_paths:
+            LOG.info(
+                f"Triggering Plex scans for {len(deleted_paths)} deleted series paths"
+            )
+            for path in deleted_paths:
+                try:
+                    await service_manager.plex.scan_item_path(path)
+                except Exception as e:
+                    LOG.warning(f"Failed to trigger Plex scan for {path}: {e}")
+
+    return deleted_count
+
+
+async def _reset_seerr_request(tmdb_id: int, media_type: MediaType) -> None:
+    """Remove requests and media items in Seerr (Overseerr/Jellyseerr) after media deletion.
+
+    Args:
+        tmdb_id: TMDB ID of the media
+        media_type: Movie or Series
+    """
+    if not service_manager.seerr:
+        print("WE RETURNED EARLY")
+        return
+
+    try:
+        if media_type is MediaType.MOVIE:
+            # delete all requests first
+            await service_manager.seerr.delete_movie_requests(tmdb_id)
+            LOG.debug(f"Deleted Seerr movie requests for TMDB ID {tmdb_id}")
+            # then delete the media item itself
+            await service_manager.seerr.delete_movie_media(tmdb_id)
+            LOG.debug(f"Deleted Seerr movie media for TMDB ID {tmdb_id}")
+        else:
+            # delete all requests first
+            await service_manager.seerr.delete_tv_requests(tmdb_id)
+            LOG.debug(f"Deleted Seerr TV requests for TMDB ID {tmdb_id}")
+            # then delete the media item itself
+            await service_manager.seerr.delete_tv_media(tmdb_id)
+            LOG.debug(f"Deleted Seerr TV media for TMDB ID {tmdb_id}")
+    except Exception as e:
+        LOG.warning(f"Failed to delete Seerr data for TMDB {tmdb_id}: {e}")
