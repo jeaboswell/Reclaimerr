@@ -10,41 +10,28 @@ function createAuthStore() {
     loading: true, // start with loading=true while we check for existing token
   });
 
-  return {
-    subscribe,
+  // initialize auth state from localStorage
+  async function init() {
+    const token = localStorage.getItem("authToken");
+    if (token) {
+      try {
+        // verify token is still valid by fetching user info
+        const response = await fetch("/api/account/me", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-    // initialize auth state from localStorage
-    init: async () => {
-      const token = localStorage.getItem("authToken");
-      if (token) {
-        try {
-          // verify token is still valid by fetching user info
-          const response = await fetch("/api/auth/me", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+        if (response.ok) {
+          const user = await response.json();
+          set({
+            isAuthenticated: true,
+            user,
+            token,
+            loading: false,
           });
-
-          if (response.ok) {
-            const user = await response.json();
-            set({
-              isAuthenticated: true,
-              user,
-              token,
-              loading: false,
-            });
-          } else {
-            // token invalid, clear it
-            localStorage.removeItem("authToken");
-            set({
-              isAuthenticated: false,
-              user: null,
-              token: null,
-              loading: false,
-            });
-          }
-        } catch (error) {
-          console.error("Failed to verify token:", error);
+        } else {
+          // token invalid, clear it
           localStorage.removeItem("authToken");
           set({
             isAuthenticated: false,
@@ -53,7 +40,9 @@ function createAuthStore() {
             loading: false,
           });
         }
-      } else {
+      } catch (error) {
+        console.error("Failed to verify token:", error);
+        localStorage.removeItem("authToken");
         set({
           isAuthenticated: false,
           user: null,
@@ -61,8 +50,19 @@ function createAuthStore() {
           loading: false,
         });
       }
-    },
+    } else {
+      set({
+        isAuthenticated: false,
+        user: null,
+        token: null,
+        loading: false,
+      });
+    }
+  }
 
+  return {
+    subscribe,
+    init,
     // login
     login: async (username: string, password: string) => {
       const response = await fetch("/api/auth/login", {
