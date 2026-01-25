@@ -45,7 +45,7 @@
     try {
       loading = true;
       profileError = "";
-      profile = await get_api<UserProfile>("/api/auth/me");
+      profile = await get_api<UserProfile>("/api/account/me");
       profileForm.display_name = profile.display_name || "";
       profileForm.email = profile.email || "";
       avatarPreview = profile.avatar_url;
@@ -64,7 +64,7 @@
         message: string;
         email: string | null;
         display_name: string | null;
-      } = await post_api("/api/auth/me", profileForm);
+      } = await post_api("/api/account/me", profileForm);
       profileForm = {
         display_name: response.display_name || "",
         email: response.email || "",
@@ -97,7 +97,7 @@
 
       const response: {
         message: string;
-      } = await post_api("/api/auth/change-password", {
+      } = await post_api("/api/account/change-password", {
         current_password: passwordForm.current_password,
         new_password: passwordForm.new_password,
       });
@@ -138,7 +138,7 @@
       profileError = "";
       const formData = new FormData();
       formData.append("avatar", avatarFile);
-      await post_api("/api/auth/avatar", formData);
+      await post_api("/api/account/avatar", formData);
       avatarFile = null;
     } catch (err: any) {
       profileError = err.message;
