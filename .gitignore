@@ -22,3 +22,5 @@ config.toml
 
 # clients
 .vscode
+
+data/
