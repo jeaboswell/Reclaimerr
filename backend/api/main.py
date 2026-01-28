@@ -10,6 +10,7 @@ from backend.api.routes import config, radarr
 from backend.api.routes.account import router as account_router
 from backend.api.routes.auth import router as auth_router
 from backend.api.routes.dashboard import router as dashboard_router
+from backend.api.routes.info import router as info_router
 from backend.api.routes.tasks import router as tasks_router
 from backend.core.logger import LOG
 from backend.core.service_manager import service_manager
@@ -117,6 +118,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # routers
+app.include_router(info_router)
 app.include_router(dashboard_router)
 app.include_router(auth_router)
 app.include_router(account_router)
