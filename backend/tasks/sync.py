@@ -8,9 +8,9 @@ from backend.core.tmdb import AsyncTMDBClient
 from backend.database import async_db
 from backend.database.models import Movie, Series, ServiceConfig
 from backend.enums import MediaType, Service
-from backend.models.clients.radarr import RadarrMovie
-from backend.models.clients.sonarr import SonarrSeries
 from backend.models.media import AggregatedMovieData, AggregatedSeriesData
+from backend.models.services.radarr import RadarrMovie
+from backend.models.services.sonarr import SonarrSeries
 from backend.services.jellyfin import JellyfinService
 from backend.services.plex import PlexService
 

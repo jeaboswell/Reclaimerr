@@ -4,8 +4,8 @@ import asyncio
 
 import niquests
 
-from backend.models.clients.radarr import RadarrMovie
 from backend.models.media import ArrTag
+from backend.models.services.radarr import RadarrMovie
 
 
 def build_radarr_movie_from_dict(data: dict) -> RadarrMovie:

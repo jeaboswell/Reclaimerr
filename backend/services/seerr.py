@@ -7,7 +7,7 @@ from typing import Any
 import niquests
 
 from backend.enums import MediaType, SeerrRequestStatus
-from backend.models.clients.seerr import SeerrPageInfo, SeerrRequest
+from backend.models.services.seerr import SeerrPageInfo, SeerrRequest
 
 
 def build_seerr_request_from_dict(data: dict[str, Any]) -> SeerrRequest:

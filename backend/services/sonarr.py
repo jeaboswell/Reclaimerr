@@ -4,8 +4,8 @@ import asyncio
 
 import niquests
 
-from backend.models.clients.sonarr import SonarrSeason, SonarrSeries
 from backend.models.media import ArrTag
+from backend.models.services.sonarr import SonarrSeason, SonarrSeries
 
 
 def build_sonarr_series_from_dict(data: dict) -> SonarrSeries:

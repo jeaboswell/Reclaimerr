@@ -8,13 +8,13 @@ import niquests
 
 from backend.core.logger import LOG
 from backend.enums import Service
-from backend.models.clients.jellyfin import (
+from backend.models.media import AggregatedMovieData, AggregatedSeriesData, ExternalIDs
+from backend.models.services.jellyfin import (
     JellyfinMovie,
     JellyfinSeries,
     JellyfinUser,
     JellyfinUserData,
 )
-from backend.models.media import AggregatedMovieData, AggregatedSeriesData, ExternalIDs
 
 
 class JellyfinService:

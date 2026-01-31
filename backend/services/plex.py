@@ -8,8 +8,8 @@ import niquests
 
 from backend.core.logger import LOG
 from backend.enums import Service
-from backend.models.clients.plex import PlexMovie, PlexSeries
 from backend.models.media import AggregatedMovieData, AggregatedSeriesData, ExternalIDs
+from backend.models.services.plex import PlexMovie, PlexSeries
 
 
 class PlexService:
