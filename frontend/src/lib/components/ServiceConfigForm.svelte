@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Switch } from "$lib/components/ui/switch/index.js";
+
   interface Props {
     tabLabel: string;
     enabled: boolean;
@@ -31,12 +33,9 @@
     </h2>
     <label class="flex items-center gap-2 cursor-pointer">
       <span class="text-sm text-foreground">Enable</span>
-      <input
-        type="checkbox"
+      <Switch
         checked={enabled}
-        onchange={(e) => dispatchChange("enabled", e.currentTarget.checked)}
-        class="w-5 h-5 rounded bg-gray-800 border-gray-700 text-primary-600
-                focus:ring-primary-500 focus:ring-offset-gray-900 cursor-pointer"
+        onCheckedChange={(checked) => dispatchChange("enabled", checked)}
       />
     </label>
   </div>
