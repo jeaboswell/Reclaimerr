@@ -8,6 +8,7 @@ class ServiceConfigUpdate(BaseModel):
     base_url: str
     api_key: str
     enabled: bool
+    libraries: list[dict] | None = None
 
     @model_validator(mode="after")
     def sanitize_fields(self) -> "ServiceConfigUpdate":
