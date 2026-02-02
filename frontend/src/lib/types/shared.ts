@@ -27,7 +27,9 @@ export enum ServiceType {
 }
 
 export type LibraryType = {
-  serviceType: ServiceType;
+  id: number;
+  libraryId: string;
+  libraryName: string;
   mediaType: MediaType;
-  libName: string;
+  selected: boolean;
 };
