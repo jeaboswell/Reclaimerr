@@ -33,9 +33,12 @@ async def get_service_settings(
     MEDIA_SERVICES = (Service.JELLYFIN, Service.PLEX)
     get_service_libraries = await db.execute(
         select(
+            ServiceMediaLibrary.id,
             ServiceMediaLibrary.service_type,
-            ServiceMediaLibrary.media_type,
+            ServiceMediaLibrary.library_id,
             ServiceMediaLibrary.library_name,
+            ServiceMediaLibrary.media_type,
+            ServiceMediaLibrary.selected,
         ).order_by(ServiceMediaLibrary.media_type)
     )
     service_libraries = get_service_libraries.all()
@@ -47,8 +50,21 @@ async def get_service_settings(
             "api_key": config.api_key,
             # sort libraries for Plex and Jellyfin only
             "libraries": [
-                [service_type, media_type, library_name]
-                for (service_type, media_type, library_name) in service_libraries
+                {
+                    "id": lib_id,
+                    "library_id": library_id,
+                    "library_name": library_name,
+                    "media_type": media_type,
+                    "selected": selected,
+                }
+                for (
+                    lib_id,
+                    service_type,
+                    library_id,
+                    library_name,
+                    media_type,
+                    selected,
+                ) in service_libraries
                 if service_type == config.service_type
             ]
             if config.service_type in MEDIA_SERVICES  # only include for these services
@@ -86,6 +102,10 @@ async def set_service_settings(
             ),
         )
     )
+
+    # update selected toggle for libraries
+    if data.service_type in (Service.JELLYFIN, Service.PLEX) and data.libraries:
+        await _upsert_service_libraries(db, data.service_type, data.libraries)
 
     return {
         "message": (
@@ -147,6 +167,26 @@ async def _toggle_service(data: ServiceConfigUpdate) -> None:
     # log the status after toggling
     statuses = await service_manager.get_status()
     LOG.debug(f"Service statuses: {statuses}")
+
+
+async def _upsert_service_libraries(
+    db: AsyncSession,
+    service_type: Service,
+    libraries: list[dict],
+) -> None:
+    """Update library selections by ID."""
+    LOG.info(f"Updating libraries for {service_type}")
+
+    for lib in libraries:
+        # update selected status by library ID
+        result = await db.execute(
+            select(ServiceMediaLibrary).where(ServiceMediaLibrary.id == lib["id"])
+        )
+        library = result.scalar_one_or_none()
+        if library:
+            library.selected = lib["selected"]
+
+    await db.commit()
 
 
 @router.post("/test/service", tags=["settings"])
