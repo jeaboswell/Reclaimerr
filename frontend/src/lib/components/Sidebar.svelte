@@ -106,7 +106,7 @@
               <div class="text-sm font-medium text-foreground">
                 {$auth.user.display_name || $auth.user.username}
               </div>
-              <div class="text-xs text-muted-foreground italic">
+              <div class="text-xs text-muted-foreground">
                 {toTitleCase($auth.user.role)}
               </div>
             </span>
