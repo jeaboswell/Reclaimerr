@@ -82,6 +82,14 @@ async def set_service_settings(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Set service settings for a given service."""
+    # test service settings before saving
+    success, error_msg = await service_manager.test_service(
+        data.service_type, data.base_url, data.api_key
+    )
+    if not success:
+        raise HTTPException(status_code=400, detail=error_msg)
+
+    # continue to upsert settings
     await _upsert_service_config(
         db,
         ServiceConfigUpdate(

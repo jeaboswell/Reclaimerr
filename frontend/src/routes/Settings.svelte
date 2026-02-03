@@ -154,6 +154,7 @@
 
   // save service settings
   async function saveServiceSettings(serviceId: string) {
+    let errorOccurred = false;
     savingService = true;
     const config = serviceState[serviceId as ServiceType].config;
     const libraries = serviceState[serviceId as ServiceType].libraries;
@@ -190,14 +191,16 @@
       toast.error(
         `Error saving settings for ${toTitleCase(serviceId)}: ${err.message}`,
       );
+      errorOccurred = true;
     } finally {
       savingService = false;
     }
 
     // if enabling Jellyfin or Plex, sync libraries after a short delay
     if (
-      serviceId === ServiceType.Jellyfin ||
-      (serviceId === ServiceType.Plex && config.enabled)
+      !errorOccurred &&
+      config.enabled &&
+      (serviceId === ServiceType.Jellyfin || serviceId === ServiceType.Plex)
     ) {
       setTimeout(async () => {
         await syncServiceLibraries(serviceId as ServiceType);
