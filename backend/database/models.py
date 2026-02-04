@@ -15,10 +15,10 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database import Base
-from backend.enums import MediaType, Service, TaskStatus, UserRole
+from backend.enums import MediaType, NotificationType, Service, TaskStatus, UserRole
 
 
 class User(Base):
@@ -49,7 +49,42 @@ class User(Base):
         DateTime, server_default=func.now(), onupdate=func.now(), init=False
     )
 
-    # TODO: eventually add tracking for push notification service(s)
+#     # relationships
+#     notification_settings: Mapped[list[NotificationSetting]] = relationship(
+#         back_populates="user", default_factory=list, lazy="noload", repr=False
+#     )
+
+
+# class NotificationSetting(Base):
+#     """Notification settings for vacuumerr."""
+
+#     __tablename__ = "notification_settings"
+
+#     id: Mapped[int] = mapped_column(
+#         Integer, primary_key=True, init=False, autoincrement=True
+#     )
+
+#     # relationships
+#     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+#     user: Mapped[User] = relationship(
+#         back_populates="notification_settings", init=False, lazy="noload", repr=False
+#     )
+
+#     enabled: Mapped[bool] = mapped_column(Boolean)
+#     url: Mapped[str] = mapped_column(String(500))
+
+#     # notification types
+#     new_cleanup_candidates: Mapped[bool] = mapped_column(Boolean, default=False)
+#     request_approved: Mapped[bool] = mapped_column(Boolean, default=False)
+#     request_declined: Mapped[bool] = mapped_column(Boolean, default=False)
+#     admin_message: Mapped[bool] = mapped_column(Boolean, default=False)
+#     # admin notification types
+#     task_failure: Mapped[bool] = mapped_column(Boolean, default=False)
+
+#     # last updated
+#     updated_at: Mapped[datetime] = mapped_column(
+#         DateTime, server_default=func.now(), onupdate=func.now(), init=False
+#     )
 
 
 class ServiceConfig(Base):
@@ -66,13 +101,32 @@ class ServiceConfig(Base):
     base_url: Mapped[str] = mapped_column(String(255))
     api_key: Mapped[str] = mapped_column(String(255))
     enabled: Mapped[bool] = mapped_column(Boolean, default=False)
-    # service specific settings
-    extra_settings: Mapped[dict | None] = mapped_column(JSON, default=None, init=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         server_default=func.now(),
         onupdate=func.now(),
         init=False,
+    )
+
+
+class ServiceMediaLibrary(Base):
+    """Media libraries available in configured services."""
+
+    __tablename__ = "service_media_libraries"
+
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, init=False, autoincrement=True
+    )
+    service_type: Mapped[Service] = mapped_column(Enum(Service))
+    library_id: Mapped[str] = mapped_column(String(50))
+    library_name: Mapped[str] = mapped_column(String(255))
+    media_type: Mapped[MediaType] = mapped_column(Enum(MediaType))
+    selected: Mapped[bool] = mapped_column(Boolean, default=False)
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), init=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), init=False
     )
 
 
