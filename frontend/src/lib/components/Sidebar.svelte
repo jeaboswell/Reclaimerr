@@ -13,6 +13,7 @@
   import DoorOpen from "@lucide/svelte/icons/door-open";
   import DoorClosed from "@lucide/svelte/icons/door-closed";
   import HardDrive from "@lucide/svelte/icons/hard-drive";
+  import Filter from "@lucide/svelte/icons/filter";
   import { toTitleCase } from "$lib/utils/strings";
 
   // optional callback to close sidebar on mobile after navigation
@@ -21,11 +22,12 @@
   // nav items: path = route path, label = display text, icon = icon component
   const navItems = [
     { path: "/", label: "Dashboard", icon: House },
-    { path: "/movies", label: "Movies", icon: ClapperBoard },
-    { path: "/series", label: "Series", icon: Tv },
-    { path: "/users", label: "Users", icon: Users },
+    // { path: "/movies", label: "Movies", icon: ClapperBoard },
+    // { path: "/series", label: "Series", icon: Tv },
+    { path: "/rules", label: "Rules", icon: Filter, adminOnly: true },
+    { path: "/users", label: "Users", icon: Users, adminOnly: true },
     { path: "/account", label: "Account", icon: User },
-    { path: "/settings", label: "Settings", icon: Settings },
+    { path: "/settings", label: "Settings", icon: Settings, adminOnly: true },
   ];
 
   // vars
@@ -63,18 +65,20 @@
   <!-- navigation -->
   <nav class="flex-1 p-4 space-y-1">
     {#each navItems as item}
-      <a
-        href={item.path}
-        use:link
-        onclick={onNavigate}
-        class="flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200
+      {#if !item.adminOnly || $auth.user?.role === "admin"}
+        <a
+          href={item.path}
+          use:link
+          onclick={onNavigate}
+          class="flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200
                {isActive(item.path)
-          ? 'bg-primary text-primary-foreground'
-          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}"
-      >
-        <item.icon />
-        <span class="font-medium">{item.label}</span>
-      </a>
+            ? 'bg-primary text-primary-foreground'
+            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}"
+        >
+          <item.icon />
+          <span class="font-medium">{item.label}</span>
+        </a>
+      {/if}
     {/each}
   </nav>
 
