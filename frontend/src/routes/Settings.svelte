@@ -253,6 +253,7 @@
               libraryName: lib.library_name,
               mediaType:
                 lib.media_type === "movie" ? MediaType.Movie : MediaType.Series,
+              serviceType: serviceId as ServiceType,
               selected: lib.selected,
             }),
           );
@@ -278,7 +279,7 @@
           media_type: string;
           selected: boolean;
         }>
-      > = await post_api("/api/settings/update/libraries", {
+      > = await post_api("/api/settings/sync/libraries", {
         service_type: serviceId,
       });
       const updatedLibraries = response[serviceId as ServiceType];
