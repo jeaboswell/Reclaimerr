@@ -24,6 +24,7 @@ export enum ServiceType {
   Seerr = "seerr",
   General = "general",
   Notifications = "notifications",
+  Tasks = "tasks",
 }
 
 export type LibraryType = {
@@ -79,4 +80,17 @@ export interface CleanupRule {
   auto_tag: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export enum ScheduleType {
+  Cron = "cron",
+  Interval = "interval",
+}
+
+export enum JobStatus {
+  Scheduled = "scheduled",
+  Success = "success",
+  Error = "error",
+  Running = "running",
+  Disabled = "disabled",
 }
