@@ -87,7 +87,7 @@ export enum ScheduleType {
   Interval = "interval",
 }
 
-export enum JobStatus {
+export enum TaskStatus {
   Scheduled = "scheduled",
   Success = "success",
   Error = "error",

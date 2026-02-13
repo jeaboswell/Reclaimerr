@@ -13,8 +13,8 @@
 
   interface Props {
     open: boolean;
-    jobId: string;
-    jobName: string;
+    taskId: string;
+    taskName: string;
     scheduleType: ScheduleType;
     scheduleValue: string;
     defaultScheduleType: ScheduleType;
@@ -53,8 +53,8 @@
 
   let {
     open = $bindable(),
-    jobId,
-    jobName,
+    taskId,
+    taskName,
     scheduleType: initialScheduleType,
     scheduleValue: initialScheduleValue,
     defaultScheduleType,
@@ -205,13 +205,13 @@
 
     saving = true;
     try {
-      await put_api(`/api/tasks/jobs/${jobId}/schedule`, {
+      await put_api(`/api/tasks/tasks/${taskId}/schedule`, {
         schedule_type: scheduleType,
         schedule_value: scheduleValue,
         enabled: enabled,
       });
 
-      toast.success(`Schedule updated for ${jobName}`);
+      toast.success(`Schedule updated for ${taskName}`);
       onSuccess();
       open = false;
     } catch (error: any) {
@@ -228,7 +228,7 @@
 <Dialog.Root bind:open>
   <Dialog.Content class="sm:max-w-125 text-foreground">
     <Dialog.Header>
-      <Dialog.Title>Edit: {truncateString(jobName, 40)}</Dialog.Title>
+      <Dialog.Title>Edit: {truncateString(taskName, 40)}</Dialog.Title>
       <Dialog.Description>
         Configure when this task should run
       </Dialog.Description>

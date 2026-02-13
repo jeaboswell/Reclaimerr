@@ -13,15 +13,15 @@
   import { toast } from "svelte-sonner";
   import { formatDistanceToNow } from "$lib/utils/date";
   import EditTaskScheduleDialog from "./EditTaskScheduleDialog.svelte";
-  import { ScheduleType, JobStatus } from "$lib/types/shared";
+  import { ScheduleType, TaskStatus } from "$lib/types/shared";
 
-  interface JobDetails {
+  interface TaskDetails {
     id: string;
     name: string;
     description: string | null;
     next_run: string | null;
     last_run: string | null;
-    status: JobStatus;
+    status: TaskStatus;
     error: string | null;
     trigger_type: string;
     schedule_type: ScheduleType;
@@ -32,59 +32,58 @@
     editable: boolean;
   }
 
-  interface JobsResponse {
-    jobs: JobDetails[];
+  interface TasksResponse {
+    tasks: TaskDetails[];
   }
 
-  let jobs = $state<JobDetails[]>([]);
+  let tasks = $state<TaskDetails[]>([]);
   let loading = $state(true);
   let refreshInterval: number | null = null;
   let actionInProgress = $state<Record<string, boolean>>({});
 
-  // Edit dialog state
+  // edit dialog state
   let editDialogOpen = $state(false);
-  let editingJob = $state<JobDetails | null>(null);
+  let editingTask = $state<TaskDetails | null>(null);
 
-  // fetch jobs from API
-  async function fetchJobs() {
+  // fetch tasks from API
+  async function fetchTasks() {
     try {
-      const response = await get_api<JobsResponse>("/api/tasks/jobs");
-      // console.log("Fetched jobs:", response.jobs);
-      jobs = response.jobs;
+      const response = await get_api<TasksResponse>("/api/tasks/tasks");
+      tasks = response.tasks;
     } catch (error) {
-      console.error("Failed to fetch jobs:", error);
+      console.error("Failed to fetch tasks:", error);
       toast.error("Failed to load scheduled tasks");
     } finally {
       loading = false;
     }
   }
 
-  async function runJobNow(jobId: string, jobName: string) {
-    actionInProgress[jobId] = true;
+  async function runTaskNow(taskId: string, taskName: string) {
+    actionInProgress[taskId] = true;
     try {
-      await post_api(`/api/tasks/jobs/${jobId}/run`, {});
-      toast.success(`${jobName} will run shortly`);
-      // Refresh to show updated status
-      await fetchJobs();
+      await post_api(`/api/tasks/tasks/${taskId}/run`, {});
+      toast.success(`${taskName} will run shortly`);
+      // refresh to show updated status
+      await fetchTasks();
     } catch (error) {
-      console.error(`Failed to run job ${jobId}:`, error);
-      toast.error(`Failed to run ${jobName}`);
+      console.error(`Failed to run task ${taskId}:`, error);
+      toast.error(`Failed to run ${taskName}`);
     } finally {
-      actionInProgress[jobId] = false;
+      actionInProgress[taskId] = false;
     }
   }
 
-  function openEditDialog(job: JobDetails) {
-    if (!job.editable || !job.schedule_type || !job.schedule_value) {
-      toast.error("This job is not editable");
+  function openEditDialog(task: TaskDetails) {
+    if (!task.editable || !task.schedule_type || !task.schedule_value) {
+      toast.error("This task is not editable");
       return;
     }
-    editingJob = job;
+    editingTask = task;
     editDialogOpen = true;
   }
 
   function handleEditSuccess() {
-    fetchJobs();
+    fetchTasks();
   }
 
   function formatInterval(seconds: number): string {
@@ -100,17 +99,17 @@
   }
 
   // status colors
-  function getStatusColor(status: JobStatus): string {
+  function getStatusColor(status: TaskStatus): string {
     switch (status) {
-      case JobStatus.Success:
+      case TaskStatus.Success:
         return "bg-green-500";
-      case JobStatus.Error:
+      case TaskStatus.Error:
         return "bg-red-500";
-      case JobStatus.Running:
+      case TaskStatus.Running:
         return "bg-blue-500";
-      case JobStatus.Disabled:
+      case TaskStatus.Disabled:
         return "bg-gray-500";
-      case JobStatus.Scheduled:
+      case TaskStatus.Scheduled:
         return "bg-yellow-500";
       default:
         return "bg-gray-500";
@@ -118,14 +117,14 @@
   }
 
   // status text
-  function getStatusText(status: JobStatus): string {
+  function getStatusText(status: TaskStatus): string {
     return status.charAt(0).toUpperCase() + status.slice(1);
   }
 
   onMount(() => {
-    fetchJobs();
-    // Poll every 10 seconds to update job status
-    refreshInterval = window.setInterval(fetchJobs, 10000);
+    fetchTasks();
+    // poll every 10 seconds to update task status
+    refreshInterval = window.setInterval(fetchTasks, 10000);
   });
 
   onDestroy(() => {
@@ -149,54 +148,54 @@
     <div class="flex justify-center py-8">
       <Spinner />
     </div>
-    <!-- show if no jobs -->
-  {:else if jobs.length === 0}
+    <!-- show if no tasks -->
+  {:else if tasks.length === 0}
     <div class="text-center py-8 text-muted-foreground">
       No scheduled tasks configured
     </div>
-    <!-- show jobs -->
+    <!-- show tasks -->
   {:else}
     <div class="space-y-4">
-      {#each jobs as job (job.id)}
+      {#each tasks as task (task.id)}
         <div class="border rounded-lg p-4 hover:bg-accent transition-colors">
           <div class="flex flex-col sm:flex-row items-start justify-between">
             <div class="flex-1">
               <div class="flex items-center gap-3">
-                <h3 class="text-foreground font-semibold">{job.name}</h3>
+                <h3 class="text-foreground font-semibold">{task.name}</h3>
                 <!-- status badge -->
-                <Badge class={getStatusColor(job.status)}>
-                  {job.enabled ? getStatusText(job.status) : "Disabled"}
+                <Badge class={getStatusColor(task.status)}>
+                  {task.enabled ? getStatusText(task.status) : "Disabled"}
                 </Badge>
               </div>
 
               <!-- description -->
-              {#if job.description}
+              {#if task.description}
                 <p class="text-sm text-muted-foreground mt-1">
-                  {job.description}
+                  {task.description}
                 </p>
               {/if}
 
               <!-- schedule and run info -->
               <div class="mt-2 space-y-1 text-sm text-muted-foreground">
                 <!-- schedule value -->
-                {#if job.schedule_value}
+                {#if task.schedule_value}
                   <span class="flex items-center" title="Schedule"
                     ><CalendarDays class="size-4 text-foreground mr-2" />
                     <!-- interval -->
-                    {#if job.schedule_type === ScheduleType.Interval}
-                      {formatInterval(parseInt(job.schedule_value))}
+                    {#if task.schedule_type === ScheduleType.Interval}
+                      {formatInterval(parseInt(task.schedule_value))}
                       <!-- cron -->
-                    {:else if job.schedule_type === ScheduleType.Cron}
-                      {job.schedule_value}
+                    {:else if task.schedule_type === ScheduleType.Cron}
+                      {task.schedule_value}
                     {/if}
                   </span>
                 {/if}
 
                 <!-- next run -->
-                {#if job.status !== JobStatus.Disabled && job.next_run}
+                {#if task.status !== TaskStatus.Disabled && task.next_run}
                   <span class="flex items-center"
                     ><ClipboardClock class="size-4 text-foreground mr-2" /> Next
-                    run: {formatDistanceToNow(job.next_run)}</span
+                    run: {formatDistanceToNow(task.next_run)}</span
                   >
                 {/if}
 
@@ -204,42 +203,44 @@
                 <span class="flex items-center"
                   ><Hourglass
                     class="size-4 text-foreground mr-2"
-                  />{job.last_run
-                    ? formatDistanceToNow(job.last_run)
+                  />{task.last_run
+                    ? formatDistanceToNow(task.last_run)
                     : "Never run"}</span
                 >
 
                 <!-- error info -->
-                {#if job.error}
+                {#if task.error}
                   <p class="flex items-center">
-                    <OctagonX class="size-4 text-destructive mr-2" />{job.error}
+                    <OctagonX
+                      class="size-4 text-destructive mr-2"
+                    />{task.error}
                   </p>
                 {/if}
               </div>
             </div>
 
             <div class="flex gap-2 ml-0 sm:ml-4 mt-4 sm:mt-0">
-              {#if job.editable}
+              {#if task.editable}
                 <Button
                   size="sm"
                   class="cursor-pointer"
-                  onclick={() => openEditDialog(job)}
-                  disabled={actionInProgress[job.id]}
+                  onclick={() => openEditDialog(task)}
+                  disabled={actionInProgress[task.id]}
                   title="Edit schedule"
                 >
                   <Pencil class="h-4 w-4" />
                 </Button>
               {/if}
 
-              {#if job.enabled}
+              {#if task.enabled}
                 <Button
                   size="sm"
                   class="cursor-pointer"
-                  onclick={() => runJobNow(job.id, job.name)}
-                  disabled={actionInProgress[job.id]}
+                  onclick={() => runTaskNow(task.id, task.name)}
+                  disabled={actionInProgress[task.id]}
                   title="Run now"
                 >
-                  {#if actionInProgress[job.id]}
+                  {#if actionInProgress[task.id]}
                     <Spinner class="h-4 w-4" />
                   {:else}
                     <Play class="h-4 w-4" />
@@ -255,16 +256,16 @@
 </div>
 
 <!-- edit schedule dialog -->
-{#if editingJob && editingJob.schedule_type && editingJob.schedule_value}
+{#if editingTask && editingTask.schedule_type && editingTask.schedule_value}
   <EditTaskScheduleDialog
     bind:open={editDialogOpen}
-    jobId={editingJob.id}
-    jobName={editingJob.name}
-    scheduleType={editingJob.schedule_type}
-    scheduleValue={editingJob.schedule_value}
-    defaultScheduleType={editingJob.default_schedule_type}
-    defaultScheduleValue={editingJob.default_schedule_value}
-    enabled={editingJob.enabled}
+    taskId={editingTask.id}
+    taskName={editingTask.name}
+    scheduleType={editingTask.schedule_type}
+    scheduleValue={editingTask.schedule_value}
+    defaultScheduleType={editingTask.default_schedule_type}
+    defaultScheduleValue={editingTask.default_schedule_value}
+    enabled={editingTask.enabled}
     onClose={() => (editDialogOpen = false)}
     onSuccess={handleEditSuccess}
   />
