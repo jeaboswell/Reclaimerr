@@ -89,7 +89,7 @@ export enum ScheduleType {
 
 export enum TaskStatus {
   Scheduled = "scheduled",
-  Success = "success",
+  Completed = "completed",
   Error = "error",
   Running = "running",
   Disabled = "disabled",
