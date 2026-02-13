@@ -29,7 +29,7 @@ from backend.utils.create_admin import create_initial_admin
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize client manager on startup."""
-    LOG.info("Starting vacuumerr API server")
+    LOG.info("Starting reclaimerr API server")
     LOG.info(f"Log level: {settings.log_level_enum}")
 
     # # Setup signal handlers for graceful shutdown # TODO: potentially?
@@ -72,15 +72,15 @@ async def lifespan(app: FastAPI):
         break  # Only need first iteration to get db session
 
     # start scheduler
-    start_scheduler()
+    await start_scheduler()
 
-    LOG.info("vacuumerr API ready")
+    LOG.info("reclaimerr API ready")
 
     try:
         yield
     finally:
         # Cleanup - this runs on both normal shutdown and signal interruption
-        LOG.info("Shutting down vacuumerr API")
+        LOG.info("Shutting down reclaimerr API")
 
         # Stop scheduler and wait for jobs to complete (with timeout)
         await shutdown_scheduler()
@@ -91,11 +91,11 @@ async def lifespan(app: FastAPI):
         # Close database connections
         await close_db()
 
-        LOG.info("vacuumerr API shutdown complete")
+        LOG.info("reclaimerr API shutdown complete")
 
 
 app = FastAPI(
-    title="vacuumerr API",
+    title="reclaimerr API",
     description="Media server cleanup and deletion management tool",
     version="0.1.0",
     lifespan=lifespan,
