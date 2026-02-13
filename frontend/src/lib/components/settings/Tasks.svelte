@@ -46,7 +46,7 @@
   let editingTask = $state<TaskDetails | null>(null);
 
   // fetch tasks from API
-  async function fetchTasks() {
+  const fetchTasks = async () => {
     try {
       const response = await get_api<TasksResponse>("/api/tasks/tasks");
       tasks = response.tasks;
@@ -56,9 +56,9 @@
     } finally {
       loading = false;
     }
-  }
+  };
 
-  async function runTaskNow(taskId: string, taskName: string) {
+  const runTaskNow = async (taskId: string, taskName: string) => {
     actionInProgress[taskId] = true;
     try {
       await post_api(`/api/tasks/tasks/${taskId}/run`, {});
@@ -71,22 +71,22 @@
     } finally {
       actionInProgress[taskId] = false;
     }
-  }
+  };
 
-  function openEditDialog(task: TaskDetails) {
+  const openEditDialog = (task: TaskDetails) => {
     if (!task.editable || !task.schedule_type || !task.schedule_value) {
       toast.error("This task is not editable");
       return;
     }
     editingTask = task;
     editDialogOpen = true;
-  }
+  };
 
-  function handleEditSuccess() {
+  const handleEditSuccess = () => {
     fetchTasks();
-  }
+  };
 
-  function formatInterval(seconds: number): string {
+  const formatInterval = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
 
@@ -96,10 +96,10 @@
       return `Every ${minutes} minute${minutes > 1 ? "s" : ""}`;
     }
     return `Every ${seconds} second${seconds > 1 ? "s" : ""}`;
-  }
+  };
 
   // status colors
-  function getStatusColor(status: TaskStatus): string {
+  const getStatusColor = (status: TaskStatus): string => {
     switch (status) {
       case TaskStatus.Completed:
         return "bg-green-500";
@@ -114,18 +114,20 @@
       default:
         return "bg-gray-500";
     }
-  }
+  };
 
   // status text
-  function getStatusText(status: TaskStatus): string {
+  const getStatusText = (status: TaskStatus): string => {
     return status.charAt(0).toUpperCase() + status.slice(1);
-  }
+  };
 
   // get display status with time-based logic for completed tasks
-  function getDisplayStatus(task: TaskDetails): {
+  const getDisplayStatus = (
+    task: TaskDetails,
+  ): {
     text: string;
     color: string;
-  } {
+  } => {
     // if disabled, show disabled
     if (!task.enabled) {
       return { text: "Disabled", color: "bg-gray-500" };
@@ -170,7 +172,7 @@
       text: getStatusText(task.status),
       color: getStatusColor(task.status),
     };
-  }
+  };
 
   onMount(() => {
     fetchTasks();
