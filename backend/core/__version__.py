@@ -3,8 +3,8 @@ from pathlib import Path
 import tomllib
 from semver import VersionInfo
 
-program_name = "vacuumerr"
-program_url = "https://github.com/jessielw/vacuumerr"
+program_name = "Reclaimerr"
+program_url = "https://github.com/jessielw/reclaimerr"
 
 # read version from pyproject.toml
 _pyproject_file = Path(__file__).parent.parent.parent / "pyproject.toml"
