@@ -25,6 +25,7 @@ class TaskStatus(StrEnum):
     RUNNING = auto()
     COMPLETED = auto()
     FAILED = auto()
+    DISABLED = auto()
 
 
 class SeerrRequestStatus(Enum):
@@ -45,3 +46,21 @@ class NotificationType(StrEnum):
 
     # admin exclusive notifications
     TASK_FAILURE = auto()
+
+
+class ScheduleType(StrEnum):
+    INTERVAL = auto()
+    CRON = auto()
+
+
+class Task(StrEnum):
+    # sync
+    SYNC_ALL_MEDIA = auto()
+    SYNC_SERVICE_LIBRARIES = auto()
+    # cleanup
+    SCAN_CLEANUP_CANDIDATES = auto()
+    TAG_CLEANUP_CANDIDATES = auto()
+    DELETE_CLEANUP_CANDIDATES = auto()
+
+    def friendly_name(self) -> str:
+        return self.name.replace("_", " ").title()
