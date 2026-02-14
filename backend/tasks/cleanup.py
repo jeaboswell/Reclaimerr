@@ -1188,7 +1188,6 @@ async def _reset_seerr_request(tmdb_id: int, media_type: MediaType) -> None:
         media_type: Movie or Series
     """
     if not service_manager.seerr:
-        print("WE RETURNED EARLY")
         return
 
     try:
