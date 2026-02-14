@@ -10,19 +10,29 @@ from backend.database import async_db, get_db
 from backend.database.models import CleanupCandidate, CleanupRule, Movie, Series
 from backend.enums import MediaType
 
+__all__ = (
+    "scan_cleanup_candidates",
+    "tag_cleanup_candidates",
+    "delete_cleanup_candidates",
+)
+
 
 async def scan_cleanup_candidates() -> None:
     """Scan media libraries and identify cleanup candidates based on configured rules."""
+    from backend.enums import Task
+    from backend.tasks.task_tracker import track_task_execution
+
     LOG.info("Starting cleanup candidates scan")
 
-    try:
-        async for db in get_db():
-            await _scan_with_db(db)
-            break
+    async with track_task_execution(Task.SCAN_CLEANUP_CANDIDATES):
+        try:
+            async for db in get_db():
+                await _scan_with_db(db)
+                break
 
-    except Exception as e:
-        LOG.error(f"Error scanning cleanup candidates: {e}", exc_info=True)
-        raise
+        except Exception as e:
+            LOG.error(f"Error scanning cleanup candidates: {e}", exc_info=True)
+            raise
 
 
 async def _scan_with_db(db: AsyncSession) -> None:
