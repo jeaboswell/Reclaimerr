@@ -5,13 +5,17 @@ import time
 from base64 import b64decode
 from collections import deque
 
-from niquests import (
-    AsyncSession,
-    ConnectionError,
-    ConnectTimeout,
+from niquests import AsyncSession, ConnectionError, ConnectTimeout, HTTPError
+from tenacity import (
+    retry,
+    retry_if_exception,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_fixed,
 )
 
 from backend.core.logger import LOG
+from backend.core.utils.request import should_retry_on_status
 
 
 class AsyncTMDBClient:
@@ -65,10 +69,19 @@ class AsyncTMDBClient:
             # record this request
             self._request_timestamps.append(time.time())
 
+    @retry(
+        stop=stop_after_attempt(5),  # 1 initial + 4 retries
+        wait=wait_fixed(2),  # 2 second delay between retries
+        retry=(
+            retry_if_exception_type((ConnectionError, ConnectTimeout))
+            | retry_if_exception(should_retry_on_status)
+        ),
+        reraise=False,  # return None on failure instead of raising
+    )
     async def _make_request(
         self, mode: str, endpoint: str, **kwargs
     ) -> dict | None | bool:
-        """Make HTTP request to TMDB API.
+        """Make HTTP request to TMDB API with automatic retry.
 
         Args:
             mode: HTTP method (GET, POST, etc.)
@@ -78,32 +91,28 @@ class AsyncTMDBClient:
         Returns:
             Parsed JSON response, None on failure, or False on 404
         """
-        MAX_RETRIES = 5
-        RETRY_DELAY = 2
+        # apply rate limiting before making the request
+        await self._wait_for_rate_limit()
 
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                # apply rate limiting before making the request
-                await self._wait_for_rate_limit()
+        try:
+            resp = await self.session.request(
+                mode, f"{self.API_URL}/{endpoint}", **kwargs
+            )
 
-                resp = await self.session.request(
-                    mode, f"{self.API_URL}/{endpoint}", **kwargs
-                )
-                if resp.status_code == 404:
-                    LOG.debug(f"404 Not Found for {endpoint}, skipping retries.")
-                    return False
-                resp.raise_for_status()
-                return resp.json()
-            except (ConnectionError, ConnectTimeout) as e:
-                if attempt == MAX_RETRIES:
-                    LOG.warning(f"Failed to get data from TMDB API ({endpoint} - {e}) ")
-                    return None
-                LOG.warning(
-                    f"Retry {attempt}/{MAX_RETRIES} for {endpoint} due to client or timeout error."
-                )
-            await asyncio.sleep(RETRY_DELAY)
+            # special handling for 404 - don't retry
+            if resp.status_code == 404:
+                LOG.debug(f"404 Not Found for {endpoint}, skipping retries.")
+                return False
 
-        return None
+            resp.raise_for_status()
+            return resp.json()
+        except HTTPError as e:
+            # for non-404 HTTP errors, re-raise to let tenacity retry
+            LOG.warning(f"HTTP error for {endpoint}: {e}")
+            raise
+        except (ConnectionError, ConnectTimeout) as e:
+            LOG.warning(f"Connection error for {endpoint}: {e}")
+            raise
 
     async def get_movie_details(self, tmdb_id: int | str) -> dict | None | bool:
         """Get movie details by TMDB ID.
