@@ -18,11 +18,19 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database import Base
-from backend.enums import MediaType, NotificationType, Service, TaskStatus, UserRole
+from backend.enums import (
+    MediaType,
+    NotificationType,
+    ScheduleType,
+    Service,
+    Task,
+    TaskStatus,
+    UserRole,
+)
 
 
 class User(Base):
-    """User account for vacuumerr."""
+    """User account for Reclaimerr."""
 
     __tablename__ = "users"
 
@@ -56,7 +64,7 @@ class User(Base):
 
 
 class NotificationSetting(Base):
-    """Notification settings for vacuumerr."""
+    """Notification settings."""
 
     __tablename__ = "notification_settings"
 
@@ -150,9 +158,11 @@ class Movie(Base):
 
     # service-specific file info (for multi-service setups with different paths)
     plex_id: Mapped[str | None] = mapped_column(String(50), default=None)
+    plex_library_id: Mapped[str | None] = mapped_column(String(50), default=None)
     plex_library_name: Mapped[str | None] = mapped_column(String(255), default=None)
     plex_path: Mapped[str | None] = mapped_column(String(1024), default=None)
     jellyfin_id: Mapped[str | None] = mapped_column(String(50), default=None)
+    jellyfin_library_id: Mapped[str | None] = mapped_column(String(50), default=None)
     jellyfin_library_name: Mapped[str | None] = mapped_column(String(255), default=None)
     jellyfin_path: Mapped[str | None] = mapped_column(String(1024), default=None)
 
@@ -224,9 +234,11 @@ class Series(Base):
 
     # service-specific file info (for multi-service setups with different paths)
     plex_id: Mapped[str | None] = mapped_column(String(50), default=None)
+    plex_library_id: Mapped[str | None] = mapped_column(String(50), default=None)
     plex_library_name: Mapped[str | None] = mapped_column(String(255), default=None)
     plex_path: Mapped[str | None] = mapped_column(String(1024), default=None)
     jellyfin_id: Mapped[str | None] = mapped_column(String(50), default=None)
+    jellyfin_library_id: Mapped[str | None] = mapped_column(String(50), default=None)
     jellyfin_library_name: Mapped[str | None] = mapped_column(String(255), default=None)
     jellyfin_path: Mapped[str | None] = mapped_column(String(1024), default=None)
 
@@ -397,10 +409,17 @@ class TaskRun(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, init=False)
 
-    # scan_cleanup_candidates, sync_watch_history, etc.
-    task_name: Mapped[str] = mapped_column(String(100))
+    task: Mapped[Task] = mapped_column(Enum(Task))
     status: Mapped[TaskStatus] = mapped_column(
         Enum(TaskStatus), default=TaskStatus.PENDING
+    )
+
+    # relationship to task schedule
+    task_schedule_id: Mapped[int | None] = mapped_column(
+        ForeignKey("task_schedules.id"), default=None
+    )
+    task_schedule: Mapped[TaskSchedule | None] = relationship(
+        back_populates="task_runs", init=False, lazy="noload", repr=False
     )
 
     # results
@@ -417,4 +436,46 @@ class TaskRun(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), init=False
+    )
+
+
+class TaskSchedule(Base):
+    """Store configurable task schedules for the scheduler."""
+
+    __tablename__ = "task_schedules"
+
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, init=False, autoincrement=True
+    )
+
+    task: Mapped[Task] = mapped_column(Enum(Task))
+
+    # schedule type: interval or cron
+    schedule_type: Mapped[ScheduleType] = mapped_column(Enum(ScheduleType))
+
+    # schedule value - either interval in seconds (for INTERVAL) or cron expression (for CRON)
+    # Examples: "28800" for 8 hours, "0 2 * * *" for daily at 2 AM
+    schedule_value: Mapped[str] = mapped_column(String(100))
+
+    # default schedule values (for reset functionality)
+    default_schedule_type: Mapped[ScheduleType] = mapped_column(Enum(ScheduleType))
+    default_schedule_value: Mapped[str] = mapped_column(String(100))
+
+    # description
+    description: Mapped[str | None] = mapped_column(Text, default=None)
+
+    # whether the job is enabled
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # relationships
+    task_runs: Mapped[list[TaskRun]] = relationship(
+        back_populates="task_schedule", default_factory=list, lazy="noload", repr=False
+    )
+
+    # timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), init=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), init=False
     )
