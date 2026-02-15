@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Annotated
 
-import apprise
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio.session import AsyncSession
