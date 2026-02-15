@@ -214,8 +214,8 @@
                 <!-- next run -->
                 {#if task.status !== TaskStatus.Disabled && task.next_run}
                   <span class="flex items-center"
-                    ><ClipboardClock class="size-4 text-foreground mr-2" /> Next
-                    run: {formatDistanceToNow(task.next_run)}</span
+                    ><ClipboardClock class="size-4 text-foreground mr-2" /> Next run:
+                    {formatDistanceToNow(task.next_run)}</span
                   >
                 {/if}
 
