@@ -6,9 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.logger import LOG
 from backend.core.service_manager import service_manager
 from backend.core.settings import settings
-from backend.database import async_db, get_db
+from backend.database import async_db
 from backend.database.models import CleanupCandidate, CleanupRule, Movie, Series
-from backend.enums import MediaType, Task
+from backend.enums import MediaType, NotificationType, Task
+from backend.services.notifications import notify_all_users
 from backend.tasks.task_tracker import track_task_execution
 
 __all__ = (
@@ -24,17 +25,26 @@ async def scan_cleanup_candidates() -> None:
 
     async with track_task_execution(Task.SCAN_CLEANUP_CANDIDATES):
         try:
-            async for db in get_db():
-                await _scan_with_db(db)
-                break
-
+            async with async_db() as session:
+                response = await _scan_with_db(session)
+                if response and response[0] > 0:
+                    try:
+                        await notify_all_users(
+                            notification_type=NotificationType.NEW_CLEANUP_CANDIDATES,
+                            title="New Cleanup Candidates Found",
+                            message=f"There are {response[0]} new cleanup candidates",
+                        )
+                    except Exception as e:
+                        LOG.error(f"Error sending cleanup scan notification: {e}")
         except Exception as e:
             LOG.error(f"Error scanning cleanup candidates: {e}", exc_info=True)
             raise
 
 
-async def _scan_with_db(db: AsyncSession) -> None:
-    """Internal method to perform scan with database session."""
+async def _scan_with_db(db: AsyncSession) -> tuple[int, int] | None:
+    """Internal method to perform scan with database session.
+
+    Returns (created_count, updated_count) or None if no rules found."""
     try:
         # load all enabled cleanup rules
         result = await db.execute(
@@ -71,6 +81,8 @@ async def _scan_with_db(db: AsyncSession) -> None:
             f"Cleanup scan completed: {candidates_created} new candidates, "
             f"{candidates_updated} updated"
         )
+
+        return candidates_created, candidates_updated
     except Exception:
         raise
 
