@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import NamedTuple
+
 from sqlalchemy import delete, select
 
 from backend.core.logger import LOG
@@ -7,16 +12,6 @@ from backend.enums import Task
 from backend.tasks.task_tracker import track_task_execution
 
 __all__ = ("weekly_house_keeping",)
-
-
-async def weekly_house_keeping() -> None:
-    async with track_task_execution(Task.WEEKLY_HOUSE_KEEPING):
-        LOG.info("Starting weekly house keeping task")
-
-        # delete old task runs, keeping only the most recent 200 runs
-        await _trim_task_runs(keep_recent=200)
-
-        LOG.info("Finished weekly house keeping task")
 
 
 async def _trim_task_runs(keep_recent: int) -> None:
@@ -37,3 +32,40 @@ async def _trim_task_runs(keep_recent: int) -> None:
         except Exception as e:
             LOG.error(f"Error trimming task runs: {e}")
             await session.rollback()
+
+
+class HouseKeepingTask(NamedTuple):
+    """Represents a house keeping task (used only internally for this module)."""
+
+    name: str
+    func: Callable
+    args: tuple | None = None
+    kwargs: dict | None = None
+
+
+# keep a tuple of house keeping tasks to run in the weekly house keeping task
+_WEEKLY_HOUSE_KEEPING_TASKS = (
+    HouseKeepingTask(
+        name="Trim old task runs",
+        func=_trim_task_runs,
+        kwargs={"keep_recent": 200},
+    ),
+)
+
+
+async def weekly_house_keeping() -> None:
+    """Perform weekly house keeping tasks."""
+    async with track_task_execution(Task.WEEKLY_HOUSE_KEEPING):
+        LOG.info("Starting weekly house keeping tasks")
+
+        for task in _WEEKLY_HOUSE_KEEPING_TASKS:
+            LOG.info(f"Starting weekly house keeping sub-task: {task.name}")
+            try:
+                args = task.args or ()
+                kwargs = task.kwargs or {}
+                await task.func(*args, **kwargs)
+                LOG.info(f"Completed weekly house keeping sub-task: {task.name}")
+            except Exception as e:
+                LOG.error(f"Error in weekly house keeping sub-task '{task.name}': {e}")
+
+        LOG.info("Finished weekly house keeping tasks")
