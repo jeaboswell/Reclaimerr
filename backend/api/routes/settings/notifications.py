@@ -13,6 +13,7 @@ from backend.database import get_db
 from backend.database.models import NotificationSetting, User
 from backend.enums import UserRole
 from backend.models.settings import NotificationSettingItem, NotificationTestRequest
+from backend.services.notifications import test_notification_url
 
 router = APIRouter(tags=["settings", "notifications"])
 
@@ -54,23 +55,10 @@ async def test_notification(
     """Test a notification by sending a test payload to the provided URL."""
     if not data.url:
         raise HTTPException(status_code=400, detail="Apprise URL is required to test")
-    ap = apprise.Apprise()
-    ap.add(data.url)
-    try:
-        result = await ap.async_notify(
-            body="This is a test notification from Reclaimerr.",
-            title="**Reclaimerr Notification Test**",
-            body_format=apprise.NotifyFormat.MARKDOWN,
-        )
-        if not result:
-            raise HTTPException(
-                status_code=400, detail="Failed to send test notification"
-            )
-    except Exception as e:
-        LOG.error(f"Error sending test notification: {e}")
-        raise HTTPException(
-            status_code=400, detail=f"Error sending test notification: {e}"
-        )
+
+    success = await test_notification_url(data.url)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to send test notification")
 
     return {"message": "Test notification sent successfully"}
 
@@ -83,9 +71,7 @@ async def create_or_update_notification(
 ) -> dict:
     """Create or update a notification setting."""
     # validate that non-admin users cannot enable admin-only notifications
-    if not (
-        current_user.role == UserRole.ADMIN or current_user.role == UserRole.MODERATOR
-    ):
+    if current_user.role is not UserRole.ADMIN:
         if data.task_failure:
             raise HTTPException(
                 status_code=403,
