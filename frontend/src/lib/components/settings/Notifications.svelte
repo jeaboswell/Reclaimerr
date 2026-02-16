@@ -385,7 +385,7 @@
                 </label>
                 <Button
                   variant="destructive"
-                  size="icon"
+                  size="icon-sm"
                   onclick={() => deleteNotification(index)}
                   disabled={saving}
                   class="cursor-pointer"
@@ -475,9 +475,10 @@
                     </label>
                     <Button
                       variant="destructive"
+                      size="icon-sm"
                       onclick={() => deleteNotification(index)}
                       disabled={saving}
-                      class="cursor-pointer gap-2"
+                      class="cursor-pointer"
                     >
                       <Trash2 />
                       Delete
