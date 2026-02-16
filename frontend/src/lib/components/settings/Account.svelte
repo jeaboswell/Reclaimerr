@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import type { Component } from "svelte";
   import { get_api, post_api } from "$lib/api";
   import ErrorBox from "$lib/components/ErrorBox.svelte";
   import Spinner from "$lib/components/ui/spinner/spinner.svelte";
@@ -8,6 +9,11 @@
   import type { UserProfile } from "$lib/types/shared";
   import Save from "@lucide/svelte/icons/save";
   import Pencil from "@lucide/svelte/icons/pencil";
+
+  interface Props {
+    svgIcon: Component | null;
+  }
+  let { svgIcon }: Props = $props();
 
   // avatar input states
   const AVATAR_IDLE = 0;
@@ -165,6 +171,21 @@
   </div>
 {:else if profile}
   <div class="space-y-6">
+    <!-- header -->
+    <div class="flex flex-col mb-3">
+      <h2 class="flex items-center gap-3 text-xl font-semibold text-foreground">
+        {console.log(svgIcon)}
+        {#if svgIcon}
+          {@const Icon = svgIcon}
+          <Icon class="size-5" aria-hidden="true" />
+        {/if}
+        <span class="align-middle">Account</span>
+      </h2>
+      <p class="text-sm text-muted-foreground mt-1">
+        Manage your account settings
+      </p>
+    </div>
+
     <!-- avatar Section -->
     <div class="bg-card rounded-lg border border-border p-6">
       <h2 class="text-xl font-semibold text-foreground mb-4">

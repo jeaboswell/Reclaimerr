@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
+  import type { Component } from "svelte";
   import { get_api, post_api } from "$lib/api";
   import { Button } from "$lib/components/ui/button/index.js";
   import { Badge } from "$lib/components/ui/badge/index.js";
@@ -14,6 +15,11 @@
   import { formatDistanceToNow } from "$lib/utils/date";
   import EditTaskScheduleDialog from "./EditTaskScheduleDialog.svelte";
   import { ScheduleType, TaskStatus } from "$lib/types/shared";
+
+  interface Props {
+    svgIcon: Component | null;
+  }
+  let { svgIcon }: Props = $props();
 
   interface TaskDetails {
     id: string;
@@ -156,7 +162,14 @@
 <div class="space-y-6">
   <!-- header -->
   <div class="flex flex-col">
-    <h2 class="text-2xl text-foreground font-semibold">Scheduled Tasks</h2>
+    <h2 class="flex items-center gap-3 text-xl font-semibold text-foreground">
+      {console.log(svgIcon)}
+      {#if svgIcon}
+        {@const Icon = svgIcon}
+        <Icon class="size-5" aria-hidden="true" />
+      {/if}
+      <span class="align-middle">Tasks</span>
+    </h2>
     <p class="text-sm text-muted-foreground mt-1">
       Manage and monitor automated tasks
     </p>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import type { Component } from "svelte";
   import { get_api, post_api, delete_api } from "$lib/api";
   import { NotificationType } from "$lib/types/shared";
   import { Button } from "$lib/components/ui/button/index.js";
@@ -17,6 +18,12 @@
   import X from "@lucide/svelte/icons/x";
   import { toast } from "svelte-sonner";
 
+  interface Props {
+    userRole: string;
+    svgIcon: Component | null;
+  }
+  let { userRole, svgIcon }: Props = $props();
+
   interface NotificationConfig {
     id: number;
     enabled: boolean;
@@ -28,12 +35,6 @@
     adminMessage: boolean;
     taskFailure: boolean;
   }
-
-  interface Props {
-    userRole: string;
-  }
-
-  let { userRole }: Props = $props();
 
   let loading = $state(false);
   let saving = $state(false);
@@ -293,7 +294,14 @@
 
 <div class="space-y-6">
   <div class="mb-6">
-    <h2 class="text-xl font-semibold text-foreground">Notification Settings</h2>
+    <h2 class="flex items-center gap-3 text-xl font-semibold text-foreground">
+      {console.log(svgIcon)}
+      {#if svgIcon}
+        {@const Icon = svgIcon}
+        <Icon class="size-5" aria-hidden="true" />
+      {/if}
+      <span class="align-middle">Notifications</span>
+    </h2>
     <p class="mt-1 text-sm text-muted-foreground">
       Configure Apprise notification services to receive alerts about media
       cleanup and requests

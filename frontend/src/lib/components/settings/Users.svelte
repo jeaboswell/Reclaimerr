@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import type { Component } from "svelte";
   import { auth } from "$lib/stores/auth";
   import { get_api, post_api, delete_api } from "$lib/api";
   import ErrorBox from "$lib/components/ErrorBox.svelte";
@@ -11,6 +12,11 @@
   import UserPlus from "@lucide/svelte/icons/user-plus";
   import UserPen from "@lucide/svelte/icons/user-pen";
   import UserX from "@lucide/svelte/icons/user-x";
+
+  interface Props {
+    svgIcon: Component | null;
+  }
+  let { svgIcon }: Props = $props();
 
   let users: User[] = $state([]);
   let loading: boolean = $state(true);
@@ -173,7 +179,14 @@
 <!-- header -->
 <div class="flex items-center justify-between mb-4">
   <div>
-    <h2 class="text-xl font-semibold text-foreground">User Management</h2>
+    <h2 class="flex items-center gap-3 text-xl font-semibold text-foreground">
+      {console.log(svgIcon)}
+      {#if svgIcon}
+        {@const Icon = svgIcon}
+        <Icon class="size-5" aria-hidden="true" />
+      {/if}
+      <span class="align-middle">Users</span>
+    </h2>
     <p class="text-sm text-muted-foreground mt-1">
       Create and manage user accounts
     </p>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import type { Component } from "svelte";
   import { fade } from "svelte/transition";
   import { get_api, post_api, delete_api } from "$lib/api";
   import { Button } from "$lib/components/ui/button/index.js";
@@ -20,6 +21,11 @@
     type LibraryType,
   } from "$lib/types/shared";
   import RuleForm from "$lib/components/settings/rules/RuleForm.svelte";
+
+  interface Props {
+    svgIcon: Component | null;
+  }
+  let { svgIcon }: Props = $props();
 
   let loading = $state(false);
   let rules = $state<ReclaimRule[]>([]);
@@ -264,9 +270,16 @@
 <!-- header -->
 <div class="flex items-center justify-between mb-4">
   <div>
-    <h2 class="text-xl font-semibold text-foreground">Cleanup Rules</h2>
+    <h2 class="flex items-center gap-3 text-xl font-semibold text-foreground">
+      {console.log(svgIcon)}
+      {#if svgIcon}
+        {@const Icon = svgIcon}
+        <Icon class="size-5" aria-hidden="true" />
+      {/if}
+      <span class="align-middle">Rules</span>
+    </h2>
     <p class="text-sm text-muted-foreground mt-1">
-      Define rules to automatically identify media for cleanup
+      Define rules to identify media for cleanup
     </p>
   </div>
   <Button onclick={createNewRule} class="cursor-pointer gap-2">
