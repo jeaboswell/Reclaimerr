@@ -1,0 +1,179 @@
+<script lang="ts">
+  import { Button } from "$lib/components/ui/button/index.js";
+  import Info from "@lucide/svelte/icons/info";
+  import ArrowDownToLine from "@lucide/svelte/icons/arrow-down-to-line";
+  import Ticket from "@lucide/svelte/icons/ticket";
+  import TicketMinus from "@lucide/svelte/icons/ticket-minus";
+  import ListX from "@lucide/svelte/icons/list-x";
+  import FileImage from "@lucide/svelte/icons/file-image";
+  import type { MediaItem, MediaType } from "$lib/types/shared";
+  import * as Tooltip from "$lib/components/ui/tooltip/index.js";
+
+  const TMDB_IMAGE_WIDTH = 500;
+
+  interface Props {
+    media: MediaItem;
+    mediaType: MediaType;
+    showMediaType?: boolean;
+    onRequestException?: (media: MediaItem) => void;
+    onViewDetails?: (media: MediaItem) => void;
+  }
+
+  let {
+    media,
+    mediaType,
+    showMediaType = false,
+    onRequestException,
+    onViewDetails,
+  }: Props = $props();
+
+  let isHovered = $state(false);
+
+  const handleRequestException = (e: Event) => {
+    e.stopPropagation();
+    if (onRequestException) {
+      onRequestException(media);
+    }
+  };
+
+  const handleInfoClick = (e: Event) => {
+    e.stopPropagation();
+    if (onViewDetails) {
+      onViewDetails(media);
+    }
+  };
+</script>
+
+<div
+  class="group relative cursor-pointer"
+  onmouseenter={() => (isHovered = true)}
+  onmouseleave={() => (isHovered = false)}
+  role="contentinfo"
+>
+  <!-- main card -->
+  <div
+    class="relative aspect-2/3 bg-gray-800 rounded-lg overflow-hidden ring-1 ring-gray-700
+      transition-all duration-300 hover:ring-2 hover:ring-gray-500 hover:scale-105"
+  >
+    <!-- poster image -->
+    {#if media.poster_url}
+      <img
+        src={`http://image.tmdb.org/t/p/w${TMDB_IMAGE_WIDTH}/${media.poster_url}`}
+        alt={media.title}
+        class="w-full h-full object-cover"
+      />
+    {:else}
+      <div class="w-full h-full flex items-center justify-center bg-gray-800">
+        <FileImage class="size-16 text-gray-500" />
+      </div>
+    {/if}
+
+    <!-- Media Type Badge (Top Left) -->
+    <!-- {#if showMediaType}
+      <div class="absolute top-2 left-2">
+        <Badge
+          class="bg-purple-600/90 text-white text-xs font-semibold backdrop-blur-sm uppercase"
+        >
+          {mediaType}
+        </Badge>
+      </div>
+    {/if} -->
+
+    <!-- info (top left) -->
+    {#if isHovered}
+      <div class="absolute top-2 left-2 z-50">
+        <Button
+          size="icon-sm"
+          class="cursor-pointer rounded-full text-foreground/30 hover:text-foreground 
+          bg-primary/30 hover:bg-primary transition-colors"
+          onclick={handleInfoClick}
+        >
+          <Info class="size-6" />
+        </Button>
+      </div>
+    {/if}
+
+    <!-- status indicators (top right) -->
+    <div class="absolute top-2 right-2 flex gap-1">
+      <!-- blacklisted -->
+      {#if media.status.is_blacklisted}
+        <div
+          class="w-7 h-7 rounded-full bg-gray-500 flex items-center justify-center z-50"
+          title="Blacklisted"
+        >
+          <Tooltip.Root>
+            <Tooltip.Trigger>
+              <ListX class="size-5 text-white cursor-help" />
+            </Tooltip.Trigger>
+            <Tooltip.Content>
+              <p>Blacklisted</p>
+            </Tooltip.Content>
+          </Tooltip.Root>
+        </div>
+      {/if}
+
+      <!-- deletion candidate -->
+      {#if media.status.is_candidate}
+        <div
+          class="w-7 h-7 rounded-full bg-yellow-500 flex items-center justify-center z-50"
+          title="Deletion Candidate"
+        >
+          <Tooltip.Root>
+            <Tooltip.Trigger>
+              <TicketMinus class="size-5 text-white cursor-help" />
+            </Tooltip.Trigger>
+            <Tooltip.Content>
+              <p>Reclaim candidate</p>
+            </Tooltip.Content>
+          </Tooltip.Root>
+        </div>
+      {/if}
+
+      <!-- pending request -->
+      {#if media.status.has_pending_request}
+        <div
+          class="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center z-50"
+          title="Pending Request"
+        >
+          <Tooltip.Root>
+            <Tooltip.Trigger>
+              <Ticket class="size-5 text-white cursor-help" />
+            </Tooltip.Trigger>
+            <Tooltip.Content>
+              <p>Pending Request</p>
+            </Tooltip.Content>
+          </Tooltip.Root>
+        </div>
+      {/if}
+    </div>
+
+    <!-- hover overlay -->
+    {#if isHovered}
+      <div
+        class="absolute inset-0 bg-linear-to-t from-black/60 via-transparent
+          to-black/60 flex flex-col justify-end p-4 transition-opacity duration-200"
+      >
+        <!-- title and year -->
+        <div class="text-left mb-3">
+          <h3 class="text-base font-semibold text-white line-clamp-2 mb-1">
+            {media.title}
+          </h3>
+          <p class="text-sm text-gray-300">{media.year}</p>
+        </div>
+
+        <!-- request button -->
+        <div class="flex z-50">
+          {#if !media.status.is_blacklisted && !media.status.has_pending_request}
+            <Button
+              class="cursor-pointer text-foreground/30 hover:text-foreground 
+              bg-primary/30 hover:bg-primary transition-colors w-full"
+              onclick={handleRequestException}
+            >
+              <ArrowDownToLine class="size-5" /> Request
+            </Button>
+          {/if}
+        </div>
+      </div>
+    {/if}
+  </div>
+</div>
