@@ -8,6 +8,7 @@
   import FileImage from "@lucide/svelte/icons/file-image";
   import type { MediaItem, MediaType } from "$lib/types/shared";
   import * as Tooltip from "$lib/components/ui/tooltip/index.js";
+  import Badge from "$lib/components/ui/badge/badge.svelte";
 
   const TMDB_IMAGE_WIDTH = 500;
 
@@ -68,28 +69,14 @@
       </div>
     {/if}
 
-    <!-- Media Type Badge (Top Left) -->
-    <!-- {#if showMediaType}
+    <!-- media type badge (top left) -->
+    {#if showMediaType}
       <div class="absolute top-2 left-2">
         <Badge
-          class="bg-purple-600/90 text-white text-xs font-semibold backdrop-blur-sm uppercase"
+          class="bg-tmdb/90 text-white text-xs font-semibold backdrop-blur-sm uppercase"
         >
           {mediaType}
         </Badge>
-      </div>
-    {/if} -->
-
-    <!-- info (top left) -->
-    {#if isHovered}
-      <div class="absolute top-2 left-2 z-50">
-        <Button
-          size="icon-sm"
-          class="cursor-pointer rounded-full text-foreground/30 hover:text-foreground 
-          bg-primary/30 hover:bg-primary transition-colors"
-          onclick={handleInfoClick}
-        >
-          <Info class="size-6" />
-        </Button>
       </div>
     {/if}
 
@@ -158,16 +145,32 @@
           <p class="text-sm text-gray-300">{media.year}</p>
         </div>
 
-        <!-- request button -->
-        <div class="flex z-50">
+        <!-- request button and info -->
+        <div class="flex gap-0.5 z-50">
+          <!-- request -->
           {#if !media.status.is_blacklisted && !media.status.has_pending_request}
             <Button
+              size="sm"
               class="cursor-pointer text-foreground/30 hover:text-foreground 
-              bg-primary/30 hover:bg-primary transition-colors w-full"
+              bg-primary/30 hover:bg-primary transition-colors flex-1 rounded-tr-none rounded-br-none"
               onclick={handleRequestException}
             >
               <ArrowDownToLine class="size-5" /> Request
             </Button>
+          {/if}
+
+          <!-- info -->
+          {#if isHovered}
+            <div>
+              <Button
+                size="sm"
+                class="cursor-pointer rounded-tl-none rounded-bl-none text-foreground/30 hover:text-foreground 
+                bg-primary/30 hover:bg-primary transition-colors"
+                onclick={handleInfoClick}
+              >
+                <Info class="size-6" />
+              </Button>
+            </div>
           {/if}
         </div>
       </div>
