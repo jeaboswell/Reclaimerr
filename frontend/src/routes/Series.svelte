@@ -1,11 +1,6 @@
 <script lang="ts">
+  import MediaBrowser from "$lib/components/media/MediaBrowser.svelte";
+  import { MediaType } from "$lib/types/shared";
 </script>
 
-<div class="p-8">
-  <div class="max-w-7xl mx-auto">
-    <div class="mb-8">
-      <h1 class="text-3xl font-bold text-gray-100 mb-2">Series</h1>
-      <p class="text-gray-400">Place holder</p>
-    </div>
-  </div>
-</div>
+<MediaBrowser mediaType={MediaType.Series} />
