@@ -120,6 +120,7 @@
   --color-info-box-bg: oklch(96.2% 0.044 156.743);
   --color-info-box-fg: oklch(44.8% 0.119 151.328);
   --color-info-box-border: oklch(87.1% 0.15 154.449);
+  --color-focus-ring: oklch(62.3% 0.214 259.815);
 }
 
 @layer base {
