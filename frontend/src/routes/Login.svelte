@@ -1,13 +1,39 @@
 <script lang="ts">
+  import { onMount, onDestroy } from "svelte";
   import { auth } from "$lib/stores/auth";
-  import logoImage from "$lib/assets/logo.png";
+  import ReclaimerrSVG from "$lib/components/svgs/ReclaimerrLogoSVG.svelte";
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { Button } from "$lib/components/ui/button/index.js";
+  import DoorOpen from "@lucide/svelte/icons/door-open";
+  import DoorClosed from "@lucide/svelte/icons/door-closed";
+  import { get_api } from "$lib/api";
 
-  let username = "";
-  let password = "";
-  let error = "";
-  let loading = false;
+  let username = $state("");
+  let password = $state("");
+  let error = $state("");
+  let loading = $state(false);
+  let loginHovered = $state(false);
 
-  async function handleLogin() {
+  // TMDB image base URLs for different sizes
+  const TMDB_BASE_URL_ORIGINAL = "https://image.tmdb.org/t/p/original";
+  const TMDB_BASE_URL_W1280 = "https://image.tmdb.org/t/p/w1280";
+  const RANDOM_BACKGROUND_IMG_INTERVAL = 15000;
+  let imageBaseUrl = TMDB_BASE_URL_ORIGINAL;
+  let refreshInterval: number | null = null;
+  let overlay: HTMLElement | null;
+  let backDropUrls: string[] = [];
+
+  // responsive image base URL logic
+  let container: HTMLElement;
+  let observer: ResizeObserver;
+
+  // dynamically set max length based on presence of '@'
+  const usernameMaxLength = $derived.by(() => {
+    return username.includes("@") ? 120 : 32;
+  });
+
+  // handle login form submission
+  const handleLogin = async () => {
     error = "";
     loading = true;
 
@@ -19,27 +45,91 @@
     } finally {
       loading = false;
     }
-  }
+  };
 
-  function handleKeydown(event: KeyboardEvent) {
+  // allow pressing Enter to submit the form
+  const handleKeydown = (event: KeyboardEvent) => {
     if (event.key === "Enter") {
       handleLogin();
     }
-  }
+  };
+
+  // update image base URL based on container width
+  const updateBaseUrl = (width: number) => {
+    if (width < 1920) {
+      imageBaseUrl = TMDB_BASE_URL_W1280;
+    } else {
+      imageBaseUrl = TMDB_BASE_URL_ORIGINAL;
+    }
+  };
+
+  // fetch and set a random background image
+  const setRandomBackgroundImage = async () => {
+    try {
+      // if we already have backdrop URLs, just pick the next one to avoid hitting the API too often
+      if (backDropUrls.length === 0) {
+        const response = await get_api<{ backdrops: string[] | null }>(
+          "/api/info/random-backdrop",
+        );
+        if (response.backdrops) {
+          backDropUrls = response.backdrops;
+        } else {
+          return;
+        }
+      }
+
+      // pick an image URL and remove it from the list
+      const imageUrl = backDropUrls.shift();
+
+      // update background image
+      if (overlay) {
+        overlay.style.opacity = "0";
+        setTimeout(() => {
+          if (!overlay) return;
+          if (imageUrl) {
+            overlay.style.backgroundImage = `url(${imageBaseUrl + imageUrl})`;
+          }
+          overlay.style.opacity = "1";
+        }, 1000); // matches transition duration in CSS for smooth fade
+      }
+    } catch (err) {
+      console.error("Failed to fetch background image:", err);
+    }
+  };
+
+  onMount(async () => {
+    overlay = document.getElementById("login-bg-overlay");
+    container = (overlay?.parentElement as HTMLElement) || document.body;
+
+    // set up ResizeObserver
+    observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        updateBaseUrl(entry.contentRect.width);
+        setRandomBackgroundImage(); // update image when size changes
+      }
+    });
+    if (container) observer.observe(container);
+
+    await setRandomBackgroundImage();
+    refreshInterval = window.setInterval(
+      setRandomBackgroundImage,
+      RANDOM_BACKGROUND_IMG_INTERVAL,
+    );
+  });
+
+  onDestroy(() => {
+    if (refreshInterval) clearInterval(refreshInterval);
+    if (observer && container) observer.unobserve(container);
+  });
 </script>
 
-<div
-  class="min-h-screen flex items-center justify-center bg-gray-950 bg-linear-to-t from-gray-700 to-gray-900 px-4"
->
+<div id="login-bg-overlay"></div>
+<div class="min-h-screen flex items-center justify-center bg-transparent px-4">
   <div class="max-w-md w-full space-y-8">
-    <!-- logo/title -->
-    <div class="text-center">
-      <img src={logoImage} alt="Reclaimerr" class="w-32 h-32 mx-auto mb-4" />
-      <h1 class="text-4xl font-bold text-blue-500 mb-2">Reclaimerr</h1>
-    </div>
-
     <!-- login form -->
-    <div class="bg-gray-900 rounded-lg shadow-xl p-8 border border-gray-800">
+    <div
+      class="bg-black/70 backdrop-blur-sm rounded-lg shadow-xl p-8 border border-primary"
+    >
       {#if error}
         <div
           class="mb-4 p-3 bg-red-900/50 border border-red-700 rounded text-red-200 text-sm"
@@ -48,65 +138,91 @@
         </div>
       {/if}
 
-      <form on:submit|preventDefault={handleLogin} class="space-y-4">
-        <div>
-          <input
-            id="username"
-            type="text"
-            bind:value={username}
-            on:keydown={handleKeydown}
-            disabled={loading}
-            class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white
-            placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500
-            focus:border-transparent disabled:opacity-50"
-            placeholder="Username / Email"
-            required
-            autocomplete="username"
-          />
-        </div>
-
-        <div>
-          <input
-            id="password"
-            type="password"
-            bind:value={password}
-            on:keydown={handleKeydown}
-            disabled={loading}
-            class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white
-            placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500
-            focus:border-transparent disabled:opacity-50"
-            placeholder="Password"
-            required
-            autocomplete="current-password"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          class="flex justify-center w-full py-2 px-4 bg-blue-600 hover:bg-blue-700
-          disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-medium rounded-md
-          transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-          focus:ring-offset-gray-900"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="size-6"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M8.25 9V5.25A2.25 2.25 0 0 1 10.5 3h6a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 
-              1 16.5 21h-6a2.25 2.25 0 0 1-2.25-2.25V15M12 9l3 3m0 0-3 3m3-3H2.25"
+      <form
+        onsubmit={(e) => {
+          e.preventDefault();
+          handleLogin();
+        }}
+        class="space-y-4"
+      >
+        <!-- logo/title -->
+        <div class="text-center">
+          <div class="flex justify-center mb-4">
+            <ReclaimerrSVG
+              class="w-1/2 stroke-13 stroke-primary-stroke {loginHovered
+                ? 'fill-primary-hover'
+                : 'fill-primary'} 
+              duration-400 transition-colors"
             />
-          </svg>
-          {loading ? "Signing in..." : "Sign In"}
-        </button>
+          </div>
+          <h1 class="text-4xl font-bold text-foreground mb-2">Reclaimerr</h1>
+        </div>
+
+        <!-- username input -->
+        <Input
+          id="username"
+          type="text"
+          bind:value={username}
+          onkeydown={handleKeydown}
+          disabled={loading}
+          required
+          class="w-full px-3 py-2 bg-gray-950/60! border border-gray-700 hover:border-primary-hover 
+            rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500
+            duration-300 transition-colors"
+          placeholder="Username / Email"
+          autocomplete="username"
+          maxlength={usernameMaxLength}
+        />
+
+        <!-- password input -->
+        <Input
+          id="password"
+          type="password"
+          bind:value={password}
+          onkeydown={handleKeydown}
+          disabled={loading}
+          required
+          class="w-full px-3 py-2 bg-gray-950/60! border border-gray-700 hover:border-primary-hover 
+            rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500
+            duration-300 transition-colors"
+          placeholder="Password"
+          autocomplete="current-password"
+          maxlength={255}
+        />
+
+        <Button
+          type="submit"
+          onmouseenter={() => (loginHovered = true)}
+          onmouseleave={() => (loginHovered = false)}
+          disabled={loading}
+          size="lg"
+          class="flex justify-center w-full py-2 px-4 bg-primary hover:bg-primary-hover 
+            text-white font-medium rounded-md transition-colors focus:ring-2 focus:ring-focus-ring 
+            cursor-pointer"
+        >
+          {#if loginHovered}
+            <DoorOpen class="size-6" />
+          {:else}
+            <DoorClosed class="size-6" />
+          {/if}
+          <span class="font-medium"
+            >{loading ? "Signing in..." : "Sign In"}</span
+          >
+        </Button>
       </form>
     </div>
   </div>
 </div>
+
+<style>
+  #login-bg-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center center;
+    opacity: 1;
+    transition: opacity 1s;
+  }
+</style>
