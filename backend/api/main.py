@@ -13,9 +13,12 @@ from backend.api.routes.account import router as account_router
 from backend.api.routes.auth import router as auth_router
 from backend.api.routes.dashboard import router as dashboard_router
 from backend.api.routes.info import router as info_router
+from backend.api.routes.media import router as media_router
+from backend.api.routes.requests import router as requests_router
 from backend.api.routes.rules import router as rules_router
 from backend.api.routes.settings import router as settings_router
 from backend.api.routes.tasks import router as tasks_router
+from backend.api.utils.exception_handlers import register_exception_handlers
 from backend.core.logger import LOG
 from backend.core.service_manager import service_manager
 from backend.core.settings import settings
@@ -101,6 +104,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# register exception handlers
+register_exception_handlers(app)
+
 # CORS middleware for Svelte frontend
 app.add_middleware(
     CORSMiddleware,
@@ -109,17 +115,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """Catch-all exception handler with logging."""
-    LOG.exception(f"Unhandled exception on {request.url.path}: {exc}")
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error", "path": str(request.url.path)},
-    )
-
 
 # routers
 app.include_router(info_router)
@@ -130,6 +125,8 @@ app.include_router(rules_router)
 app.include_router(account_router)
 app.include_router(radarr.router)
 app.include_router(tasks_router)
+app.include_router(media_router)
+app.include_router(requests_router)
 
 
 # mount static files LAST - after all routes
