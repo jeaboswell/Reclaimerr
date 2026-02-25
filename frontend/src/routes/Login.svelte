@@ -166,8 +166,8 @@
           onkeydown={handleKeydown}
           disabled={loading}
           required
-          class="w-full px-3 py-2 bg-gray-950/60! border border-gray-700 input-hover
-            rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          class="w-full px-3 py-2 bg-gray-950/60! border border-gray-700 input-hover-el
+            rounded-md text-white placeholder-gray-500"
           placeholder="Username / Email"
           autocomplete="username"
           minlength={5}
@@ -182,8 +182,8 @@
           onkeydown={handleKeydown}
           disabled={loading}
           required
-          class="w-full px-3 py-2 bg-gray-950/60! border border-gray-700 input-hover
-            rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          class="w-full px-3 py-2 bg-gray-950/60! border border-gray-700 input-hover-el
+            rounded-md text-white placeholder-gray-500"
           placeholder="Password"
           autocomplete="current-password"
           minlength={8}
