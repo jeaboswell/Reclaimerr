@@ -134,3 +134,7 @@
     @apply bg-background text-foreground;
   }
 }
+
+.input-hover:hover {
+  @apply border-primary-hover duration-300 transition-colors;
+}
