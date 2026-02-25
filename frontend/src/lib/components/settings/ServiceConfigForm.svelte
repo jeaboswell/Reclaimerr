@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Component } from "svelte";
   import { Switch } from "$lib/components/ui/switch/index.js";
+  import { Input } from "$lib/components/ui/input/index.js";
 
   interface Props {
     tabLabel: string;
@@ -51,15 +52,14 @@
     <label for="baseUrl" class="block text-sm font-medium text-foreground mb-2"
       >Base URL</label
     >
-    <input
+    <Input
       type="url"
       name="baseUrl"
       value={baseUrl}
       oninput={(e) => dispatchChange("baseUrl", e.currentTarget.value)}
       placeholder={baseUrlPlaceholder || "http://localhost:8096"}
-      class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground
-                  placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring
-                  focus:border-transparent"
+      class="input-hover rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-1 
+        focus:ring-blue-500"
     />
     <p class="mt-1 text-xs text-muted-foreground">
       The URL where your {tabLabel} instance is running
@@ -70,15 +70,14 @@
     <label for="apiKey" class="block text-sm font-medium text-foreground mb-2"
       >API Key</label
     >
-    <input
+    <Input
       type="password"
       name="apiKey"
       value={apiKey}
       oninput={(e) => dispatchChange("apiKey", e.currentTarget.value)}
       placeholder="Enter your API key"
-      class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground
-                  placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring
-                  focus:border-transparent"
+      class="input-hover rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-1 
+        focus:ring-blue-500"
     />
     <p class="mt-1 text-xs text-muted-foreground">
       Your {tabLabel} API key for authentication
