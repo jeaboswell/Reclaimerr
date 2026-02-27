@@ -155,7 +155,7 @@
   // filter tabs based on user role
   const isAdmin = $derived($auth.user?.role === "admin");
   const canManageUsers = $derived(
-    isAdmin || ($auth.user?.permissions ?? []).includes(Permission.Moderator),
+    isAdmin || ($auth.user?.permissions ?? []).includes(Permission.ManageUsers),
   );
   const filteredTabGroups = $derived(
     tabGroups
@@ -431,7 +431,7 @@
   });
 </script>
 
-<div class="p-8">
+<div class="p-2 md:p-8">
   <div class="max-w-7xl mx-auto">
     <div class="mb-2">
       <h1 class="text-3xl font-bold text-foreground mb-2">Settings</h1>
