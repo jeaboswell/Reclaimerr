@@ -58,8 +58,7 @@
       value={baseUrl}
       oninput={(e) => dispatchChange("baseUrl", e.currentTarget.value)}
       placeholder={baseUrlPlaceholder || "http://localhost:8096"}
-      class="input-hover rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-1 
-        focus:ring-blue-500"
+      class="input-hover-el"
     />
     <p class="mt-1 text-xs text-muted-foreground">
       The URL where your {tabLabel} instance is running
@@ -76,8 +75,7 @@
       value={apiKey}
       oninput={(e) => dispatchChange("apiKey", e.currentTarget.value)}
       placeholder="Enter your API key"
-      class="input-hover rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-1 
-        focus:ring-blue-500"
+      class="input-hover-el"
     />
     <p class="mt-1 text-xs text-muted-foreground">
       Your {tabLabel} API key for authentication
