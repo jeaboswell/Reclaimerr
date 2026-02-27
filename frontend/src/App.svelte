@@ -1,8 +1,8 @@
 <script lang="ts">
   import Router from "svelte-spa-router";
-  import { auth } from "./lib/stores/auth";
+  import { auth } from "$lib/stores/auth";
   import { ModeWatcher } from "mode-watcher";
-  import Sidebar from "./lib/components/Sidebar.svelte";
+  import Sidebar from "$lib/components/Sidebar.svelte";
   import Login from "./routes/Login.svelte";
   import Dashboard from "./routes/Dashboard.svelte";
   import Requests from "./routes/Requests.svelte";
@@ -15,6 +15,7 @@
   import Menu from "@lucide/svelte/icons/menu";
   import X from "@lucide/svelte/icons/x";
   import * as Tooltip from "$lib/components/ui/tooltip/index.js";
+  import logoImage from "$lib/assets/logo.png";
 
   const routes = {
     "/": Dashboard,
@@ -70,6 +71,7 @@
             <Menu class="w-6 h-6 text-foreground" />
           {/if}
         </button>
+        <img src={logoImage} alt="reclaimerr logo" class="w-6 h-6" />
         <h1 class="font-semibold text-lg text-foreground">Reclaimerr</h1>
       </div>
 
@@ -92,8 +94,8 @@
         <Sidebar onNavigate={closeSidebar} />
       </div>
 
-      <!-- main content with top padding on mobile for header -->
-      <main class="flex-1 overflow-y-auto pt-14 lg:pt-0">
+      <!-- main content with top margin on mobile for fixed header -->
+      <main class="flex-1 overflow-y-auto mt-14 lg:mt-0">
         <Router {routes} />
       </main>
     </div>
