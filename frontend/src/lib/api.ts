@@ -36,8 +36,11 @@ export async function fetchAPI(url: string, options: RequestInit = {}) {
 /**
  * helper for GET requests
  */
-export async function get_api<T>(url: string): Promise<T> {
-  const response = await fetchAPI(url);
+export async function get_api<T>(
+  url: string,
+  signal?: AbortSignal,
+): Promise<T> {
+  const response = await fetchAPI(url, { signal });
 
   if (!response.ok) {
     const error = await response
