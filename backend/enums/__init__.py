@@ -6,6 +6,14 @@ class UserRole(StrEnum):
     ADMIN = auto()
 
 
+class Permission(StrEnum):
+    MANAGE_USERS = auto()
+    MANAGE_REQUESTS = auto()
+    REQUEST = auto()
+    AUTO_APPROVE = auto()
+    MANAGE_BLOCK_LIST = auto()
+
+
 class Service(StrEnum):
     SONARR = auto()
     RADARR = auto()
@@ -17,6 +25,12 @@ class Service(StrEnum):
 class MediaType(StrEnum):
     MOVIE = auto()
     SERIES = auto()
+
+
+class ExceptionRequestStatus(StrEnum):
+    PENDING = auto()
+    APPROVED = auto()
+    DENIED = auto()
 
 
 class TaskStatus(StrEnum):
