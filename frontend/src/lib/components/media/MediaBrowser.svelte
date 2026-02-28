@@ -173,7 +173,7 @@
   });
 </script>
 
-<div class="p-2 md:p-8">
+<div class="p-2.5 md:p-8">
   <div class="max-w-450 mx-auto">
     <!-- header -->
     <div class="mb-8">
