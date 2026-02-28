@@ -183,13 +183,13 @@
           {#if canRequest}
             <Button
               size="sm"
-              class="cursor-pointer text-foreground/30 hover:text-foreground 
+              class="cursor-pointer text-gray-200/30 hover:text-gray-200
               bg-primary/30 hover:bg-primary transition-colors rounded-tr-none rounded-br-none
               {cardWidth > REQUEST_TEXT_MIN_WIDTH ? 'flex-1' : ''}
               {!canRequest ? '' : 'rounded-tr-none rounded-br-none'}"
               onclick={handleRequestException}
             >
-              <ArrowDownToLine class="size-5 text-gray-300" />
+              <ArrowDownToLine class="size-5" />
               {#if cardWidth > REQUEST_TEXT_MIN_WIDTH}
                 Request
               {/if}
@@ -200,12 +200,12 @@
           <div>
             <Button
               size="sm"
-              class="cursor-pointer text-foreground/30 hover:text-foreground 
+              class="cursor-pointer text-gray-200/30 hover:text-gray-200
               bg-primary/30 hover:bg-primary transition-colors 
               {!canRequest ? '' : 'rounded-tl-none rounded-bl-none'}"
               onclick={handleInfoClick}
             >
-              <Info class="size-6 text-gray-300" />
+              <Info class="size-6" />
             </Button>
           </div>
         </div>
