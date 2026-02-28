@@ -575,36 +575,32 @@
               </p>
             </div>
 
-            {#if activeTab === SettingsTab.Jellyfin || activeTab === SettingsTab.Plex}
-              {#if serviceState[activeTab].libraries.length > 0}
-                {#each serviceState[activeTab].libraries as library}
-                  <Badge
-                    variant="secondary"
-                    class="text-sm px-3 py-1 rounded-full bg-muted text-muted-foreground m-0.5 w-55 justify-between
-                      {library.mediaType === MediaType.Movie
-                      ? 'border-movie'
-                      : 'border-series'}"
-                  >
-                    <div
-                      class="inline-flex flex-1 max-w-4/5 items-center gap-2"
+            {#if serviceState[activeTab].libraries.length > 0}
+              {#each serviceState[activeTab].libraries as library}
+                <Badge
+                  variant="secondary"
+                  class="text-sm px-3 py-1 rounded-full bg-muted text-muted-foreground m-0.5 w-55 justify-between
+                    {library.mediaType === MediaType.Movie
+                    ? 'border-movie'
+                    : 'border-series'}"
+                >
+                  <div class="inline-flex flex-1 max-w-4/5 items-center gap-2">
+                    {#if library.mediaType === MediaType.Movie}<Clapperboard
+                        size="18"
+                      />{:else}<Tv size="18" />{/if}
+                    <span class="truncate" title={library.libraryName}
+                      >{library.libraryName}</span
                     >
-                      {#if library.mediaType === MediaType.Movie}<Clapperboard
-                          size="18"
-                        />{:else}<Tv size="18" />{/if}
-                      <span class="truncate" title={library.libraryName}
-                        >{library.libraryName}</span
-                      >
-                    </div>
-                    <Switch
-                      class="ml-1 cursor-pointer"
-                      checked={library.selected}
-                      onCheckedChange={(checked) => {
-                        library.selected = checked;
-                      }}
-                    />
-                  </Badge>
-                {/each}
-              {/if}
+                  </div>
+                  <Switch
+                    class="ml-1 cursor-pointer"
+                    checked={library.selected}
+                    onCheckedChange={(checked) => {
+                      library.selected = checked;
+                    }}
+                  />
+                </Badge>
+              {/each}
             {/if}
 
             <hr class="h-1 my-4 border-muted-foreground" />
