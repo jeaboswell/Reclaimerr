@@ -137,9 +137,6 @@ class MovieWithStatus(BaseModel):
     # timestamps
     added_at: str | None
 
-    class Config:
-        from_attributes = True
-
 
 class SeriesWithStatus(BaseModel):
     """Series with all metadata and status information."""
@@ -188,9 +185,6 @@ class SeriesWithStatus(BaseModel):
 
     # timestamps
     added_at: str | None
-
-    class Config:
-        from_attributes = True
 
 
 class PaginatedMediaResponse(BaseModel):
