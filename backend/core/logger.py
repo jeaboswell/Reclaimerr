@@ -3,9 +3,8 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from backend.core.__version__ import __version__, program_name
-from backend.core.logger.enums import LogSource
-from backend.core.logger.levels import LogLevel
 from backend.core.settings import settings
+from backend.enums import LogLevel, LogSource
 
 
 class Logger:
