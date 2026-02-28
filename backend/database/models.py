@@ -19,6 +19,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database import Base
 from backend.enums import (
+    ExceptionRequestStatus,
     MediaType,
     ScheduleType,
     Service,
@@ -36,13 +37,14 @@ class User(Base):
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, init=False, autoincrement=True
     )
-    username: Mapped[str] = mapped_column(String(255), unique=True, init=True)
+    username: Mapped[str] = mapped_column(String(32), unique=True, init=True)
     password_hash: Mapped[str] = mapped_column(String(255), init=True)
-    email: Mapped[str | None] = mapped_column(String(255), unique=True, default=None)
-    display_name: Mapped[str | None] = mapped_column(String(64), default=None)
+    email: Mapped[str | None] = mapped_column(String(120), unique=True, default=None)
+    display_name: Mapped[str | None] = mapped_column(String(32), default=None)
 
     # permissions
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.USER)
+    permissions: Mapped[list[str]] = mapped_column(JSON, default_factory=list)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     require_password_change: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -213,6 +215,11 @@ class Movie(Base):
         DateTime, default=None, init=False
     )
 
+    # relationships
+    exception_requests: Mapped[list[ExceptionRequest]] = relationship(
+        back_populates="movie", default_factory=list, lazy="noload", repr=False
+    )
+
 
 class Series(Base):
     """Series availability and metadata."""
@@ -292,6 +299,11 @@ class Series(Base):
     # cache freshness
     last_metadata_refresh_at: Mapped[datetime | None] = mapped_column(
         DateTime, default=None, init=False
+    )
+
+    # relationships
+    exception_requests: Mapped[list[ExceptionRequest]] = relationship(
+        back_populates="series", default_factory=list, lazy="noload", repr=False
     )
 
 
@@ -391,6 +403,114 @@ class ReclaimCandidate(Base):
 
     # space savings
     estimated_space_gb: Mapped[float | None] = mapped_column(Float, default=None)
+
+    # timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), init=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), init=False
+    )
+
+
+class MediaBlacklist(Base):
+    """Media items protected from deletion/cleanup."""
+
+    __tablename__ = "media_blacklist"
+
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, init=False, autoincrement=True
+    )
+
+    # media identification
+    media_type: Mapped[MediaType] = mapped_column(Enum(MediaType))
+
+    # blacklist details (required fields first for dataclass)
+    blacklisted_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+
+    # foreign keys (one will be set based on media_type)
+    movie_id: Mapped[int | None] = mapped_column(
+        ForeignKey("movies.id"), unique=True, default=None
+    )
+    series_id: Mapped[int | None] = mapped_column(
+        ForeignKey("series.id"), unique=True, default=None
+    )
+
+    # optional details
+    reason: Mapped[str | None] = mapped_column(Text, default=None)
+    blacklisted_by: Mapped[User] = relationship(init=False, lazy="noload", repr=False)
+
+    # expiration options
+    permanent: Mapped[bool] = mapped_column(Boolean, default=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+
+    # timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), init=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), init=False
+    )
+
+
+class ExceptionRequest(Base):
+    """User requests for media to be excluded from cleanup."""
+
+    __tablename__ = "exception_requests"
+
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, init=False, autoincrement=True
+    )
+
+    # media identification
+    media_type: Mapped[MediaType] = mapped_column(Enum(MediaType))
+
+    # request details (required fields first for dataclass)
+    requested_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    reason: Mapped[str] = mapped_column(Text)
+    requested_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime, default=None
+    )
+
+    # foreign keys (one will be set based on media_type)
+    movie_id: Mapped[int | None] = mapped_column(ForeignKey("movies.id"), default=None)
+    series_id: Mapped[int | None] = mapped_column(ForeignKey("series.id"), default=None)
+    movie: Mapped[Movie | None] = relationship(
+        back_populates="exception_requests",
+        init=False,
+        lazy="noload",
+        repr=False,
+    )
+    series: Mapped[Series | None] = relationship(
+        back_populates="exception_requests",
+        init=False,
+        lazy="noload",
+        repr=False,
+    )
+
+    # candidate reference (if it was a candidate when requested)
+    candidate_id: Mapped[int | None] = mapped_column(
+        ForeignKey("reclaim_candidates.id"), default=None
+    )
+
+    requested_by: Mapped[User] = relationship(
+        foreign_keys=[requested_by_user_id], init=False, lazy="noload", repr=False
+    )
+
+    # status: pending, approved, denied
+    status: Mapped[ExceptionRequestStatus] = mapped_column(
+        Enum(ExceptionRequestStatus), default=ExceptionRequestStatus.PENDING
+    )
+
+    # admin review
+    reviewed_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), default=None
+    )
+    reviewed_by: Mapped[User | None] = relationship(
+        foreign_keys=[reviewed_by_user_id], init=False, lazy="noload", repr=False
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+    admin_notes: Mapped[str | None] = mapped_column(Text, default=None)
 
     # timestamps
     created_at: Mapped[datetime] = mapped_column(
