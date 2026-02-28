@@ -6,19 +6,25 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from backend.core.__version__ import __version__
-from backend.core.logger.levels import LogLevel
+from backend.enums import LogLevel
 
 
 class Settings(BaseSettings):
-    """Bootstrap settings loaded from environment variables.
-
-    Note: Service credentials (Plex, Jellyfin, Radarr, Sonarr) are stored
-    in the database (ServiceConfig table) and managed via the UI.
-    """
+    """Bootstrap settings loaded from environment variables."""
 
     # application data directory
     data_dir: Path = Field(
         default=Path("./data"), description="Directory for database, logs, cache"
+    )
+
+    # static directory
+    static_dir: Path = Field(
+        default=Path("./data/static"), description="Directory for static files"
+    )
+
+    # avatars directory
+    avatars_dir: Path = Field(
+        default=Path("./data/static/avatars"), description="Directory for user avatars"
     )
 
     # logging
@@ -26,10 +32,21 @@ class Settings(BaseSettings):
         default="INFO", description="Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL"
     )
 
+    # admin
+    admin_password: str | None = Field(
+        default=None, description="Initial admin password"
+    )
+
     # API configuration
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     cors_origins: str = "*"  # comma-separated list or "*" for all
+
+    # JWT authentication
+    jwt_secret: str = Field(
+        default="CHANGE_ME_IN_PRODUCTION", description="Secret key for JWT tokens"
+    )
+    jwt_algorithm: str = "HS256"
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -43,9 +60,8 @@ class Settings(BaseSettings):
     def validate_log_level(cls, v: str) -> str:
         """Validate log level is valid."""
         try:
-            LogLevel[v.upper()]
-            return v.upper()
-        except KeyError:
+            return str(LogLevel(v.upper())).upper()
+        except ValueError:
             return "INFO"
 
     @property
@@ -55,9 +71,21 @@ class Settings(BaseSettings):
         return self.data_dir
 
     @property
+    def static_dir_path(self) -> Path:
+        """Get static directory as Path object (ensures directory/sub directories exists)."""
+        self.static_dir.mkdir(parents=True, exist_ok=True)
+        return self.static_dir
+
+    @property
+    def avatars_dir_path(self) -> Path:
+        """Get avatars directory as Path object (ensures directory exists)."""
+        self.avatars_dir.mkdir(parents=True, exist_ok=True)
+        return self.avatars_dir
+
+    @property
     def db_path(self) -> Path:
         """Get database file path."""
-        db_path = self.data_dir_path / "database" / "vacuumarr.db"
+        db_path = self.data_dir_path / "database" / "reclaimerr.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
         return db_path
 
