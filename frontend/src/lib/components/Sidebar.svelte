@@ -2,7 +2,7 @@
   import { link, location } from "svelte-spa-router";
   import { auth } from "../stores/auth";
   import ThemeToggle from "./ThemeToggle.svelte";
-  import logoImage from "../assets/logo.png";
+  import logoImage from "$lib/assets/logo.png";
   import { VERSION } from "$lib/version";
   import House from "@lucide/svelte/icons/house";
   import ClapperBoard from "@lucide/svelte/icons/clapperboard";
@@ -43,20 +43,17 @@
 
 <aside class="w-64 bg-card border-r border-border flex flex-col h-full">
   <!-- logo -->
-  <div class="p-6 border-b border-border">
-    <div class="flex items-center gap-3">
-      <div class="flex gap-3">
+  <div class="relative p-6 border-b border-border">
+    <div class="flex just items-center gap-3">
+      <div class="flex gap-3 items-center">
         <div class="w-12 h-12 flex items-center justify-center">
           <img src={logoImage} alt="reclaimerr logo" class="w-10 h-10" />
         </div>
-        <div>
-          <h1 class="text-xl font-bold text-foreground">Reclaimerr</h1>
-          <p class="text-xs text-muted-foreground">Media Cleanup</p>
-        </div>
+        <h1 class="text-xl font-bold text-foreground">Reclaimerr</h1>
       </div>
-      <!-- theme toggle -->
-      <ThemeToggle />
     </div>
+    <!-- theme toggle -->
+    <ThemeToggle class="absolute top-1 right-1" />
   </div>
 
   <!-- navigation -->
@@ -103,14 +100,16 @@
                 {$auth.user.username.charAt(0).toUpperCase()}
               </div>
             {/if}
-            <span>
+            <div>
               <div class="text-sm font-medium text-foreground">
-                {$auth.user.display_name || $auth.user.username}
+                <p class="truncate overflow-hidden whitespace-nowrap w-40">
+                  {$auth.user.display_name || $auth.user.username}
+                </p>
               </div>
               <div class="text-xs text-muted-foreground">
                 {toTitleCase($auth.user.role)}
               </div>
-            </span>
+            </div>
           </div>
         </div>
 
