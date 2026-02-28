@@ -133,7 +133,7 @@
     } finally {
       loading = false;
     }
-  }
+  };
 
   $effect(() => {
     if (filteredRequests.length === 0) {
@@ -152,18 +152,18 @@
     approveDuration = "user_requested";
     approveCustomDays = "30";
     approveDialogOpen = true;
-  }
+  };
 
   const openDeny = (req: ExceptionRequest) => {
     denyTarget = req;
     denyNotes = "";
     denyDialogOpen = true;
-  }
+  };
 
   const openCancel = (req: ExceptionRequest) => {
     cancelTarget = req;
     cancelDialogOpen = true;
-  }
+  };
 
   const toggleSelection = (requestId: number) => {
     if (selectedIds.includes(requestId)) {
@@ -171,7 +171,7 @@
       return;
     }
     selectedIds = [...selectedIds, requestId];
-  }
+  };
 
   const toggleSelectAllPending = () => {
     if (allPendingSelected) {
@@ -182,19 +182,19 @@
     }
     const merged = new Set([...selectedIds, ...pendingInView.map((r) => r.id)]);
     selectedIds = [...merged];
-  }
+  };
 
   const openBulkApprove = () => {
     bulkNotes = "";
     bulkDuration = "user_requested";
     bulkCustomDays = "30";
     bulkApproveDialogOpen = true;
-  }
+  };
 
   const openBulkDeny = () => {
     bulkNotes = "";
     bulkDenyDialogOpen = true;
-  }
+  };
 
   const submitApprove = async () => {
     if (!approveTarget) return;
@@ -234,7 +234,7 @@
     } finally {
       approveSubmitting = false;
     }
-  }
+  };
 
   const submitDeny = async () => {
     if (!denyTarget) return;
@@ -251,7 +251,7 @@
     } finally {
       denySubmitting = false;
     }
-  }
+  };
 
   const submitCancel = async () => {
     if (!cancelTarget) return;
@@ -266,7 +266,7 @@
     } finally {
       cancelSubmitting = false;
     }
-  }
+  };
 
   const submitBulkApprove = async () => {
     if (selectedPendingIds.length === 0) return;
@@ -325,7 +325,7 @@
     } finally {
       bulkSubmitting = false;
     }
-  }
+  };
 
   const submitBulkDeny = async () => {
     if (selectedPendingIds.length === 0) return;
@@ -361,12 +361,12 @@
     } finally {
       bulkSubmitting = false;
     }
-  }
+  };
 
   const formatProtectionLabel = (req: ExceptionRequest): string => {
     if (!req.requested_expires_at) return "Forever";
     return `Until ${formatDate(req.requested_expires_at)}`;
-  }
+  };
 
   const formatEffectiveProtectionLabel = (req: ExceptionRequest): string => {
     if (req.status !== ExceptionRequestStatus.Approved) {
@@ -378,14 +378,14 @@
       return `Until ${formatDate(req.effective_expires_at)}`;
 
     return formatProtectionLabel(req);
-  }
+  };
 
   const hasProtectionOverride = (req: ExceptionRequest): boolean => {
     return (
       req.status === ExceptionRequestStatus.Approved &&
       formatEffectiveProtectionLabel(req) !== formatProtectionLabel(req)
     );
-  }
+  };
 
   onMount(() => {
     loadRequests();
