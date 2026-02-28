@@ -189,7 +189,7 @@
               {!canRequest ? '' : 'rounded-tr-none rounded-br-none'}"
               onclick={handleRequestException}
             >
-              <ArrowDownToLine class="size-5" />
+              <ArrowDownToLine class="size-5 text-gray-300" />
               {#if cardWidth > REQUEST_TEXT_MIN_WIDTH}
                 Request
               {/if}
@@ -205,7 +205,7 @@
               {!canRequest ? '' : 'rounded-tl-none rounded-bl-none'}"
               onclick={handleInfoClick}
             >
-              <Info class="size-6" />
+              <Info class="size-6 text-gray-300" />
             </Button>
           </div>
         </div>
