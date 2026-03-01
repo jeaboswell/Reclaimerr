@@ -243,7 +243,7 @@ async def upload_avatar(
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
     avatar: UploadFile = File(...),
-):
+) -> dict[str, str]:
     """Upload user avatar."""
     # validate file type
     if not avatar.content_type or not avatar.content_type.startswith("image/"):
@@ -275,5 +275,5 @@ async def upload_avatar(
 
     return {
         "message": "Avatar uploaded successfully",
-        "avatar_path": avatar_filename,
+        "path": avatar_filename,
     }
