@@ -18,6 +18,7 @@
   import { Label } from "$lib/components/ui/label/index.js";
   import { Checkbox } from "$lib/components/ui/checkbox/index.js";
   import * as Select from "$lib/components/ui/select/index.js";
+  import * as Avatar from "$lib/components/ui/avatar/index.js";
   import UserPlus from "@lucide/svelte/icons/user-plus";
   import UserPen from "@lucide/svelte/icons/user-pen";
   import UserX from "@lucide/svelte/icons/user-x";
@@ -84,9 +85,9 @@
       description: "Automatically approve your own requests",
     },
     {
-      value: Permission.ManageBlocklist,
-      label: "Manage blocklist",
-      description: "Reserved for explicit blocklist management",
+      value: Permission.ManageBlacklist,
+      label: "Manage blacklist",
+      description: "Manage protected media entries in the blacklist",
     },
   ];
 
@@ -317,20 +318,22 @@
               <div class="flex items-center gap-3">
                 <div class="relative">
                   {#if user.avatar_url}
-                    <div>
-                      <img
-                        src={user.avatar_url}
-                        alt="Avatar"
-                        class="w-16 h-16 max-w-16 rounded-full object-cover border-4 border-primary"
-                      />
-                    </div>
+                    <Avatar.Root class="w-16 h-16 border-2 border-primary">
+                      <Avatar.Image src={user.avatar_url} alt={user.username} />
+                      <Avatar.Fallback
+                        >{user.username
+                          .charAt(0)
+                          .toUpperCase()}</Avatar.Fallback
+                      >
+                    </Avatar.Root>
                   {:else}
-                    <div
-                      class="w-16 h-16 rounded-full bg-primary text-primary-foreground flex items-center
-                      justify-center text-2xl font-bold border-4 border-primary"
+                    <Avatar.Root
+                      class="w-16 h-16 text-2xl text-primary-foreground font-bold"
                     >
-                      {user.username.charAt(0).toUpperCase()}
-                    </div>
+                      <Avatar.Fallback class="bg-primary">
+                        {user.username.charAt(0).toUpperCase()}
+                      </Avatar.Fallback>
+                    </Avatar.Root>
                   {/if}
                 </div>
 
