@@ -1013,10 +1013,10 @@
           </div>
           <p class="text-xs text-muted-foreground mt-3">
             Same formats and limits as posters, re-applied on every sync. Thumbs
-            are pushed to <strong>Jellyfin and Emby only</strong> - a Plex
-            collection's thumb is its poster, so there is nothing separate to
-            set. Removing a thumb only stops Reclaimerr pushing it; the last
-            thumb pushed stays until you change it on the server.
+            are pushed to <strong>Jellyfin and Emby only</strong> - a Plex collection's
+            thumb is its poster, so there is nothing separate to set. Removing a thumb
+            only stops Reclaimerr pushing it; the last thumb pushed stays until you
+            change it on the server.
           </p>
         </div>
 
